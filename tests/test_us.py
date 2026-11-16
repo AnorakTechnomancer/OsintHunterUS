@@ -1,6 +1,7 @@
 import unittest
 from app.modules.us import normalize_ein, normalize_us_zip
 from app.models import detect_type, normalize
+from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI
 
 class USInputsTest(unittest.TestCase):
     def test_zip(self):
@@ -22,6 +23,20 @@ class USInputsTest(unittest.TestCase):
     def test_normalize(self):
         self.assertEqual(normalize("ein", "123456789"), "12-3456789")
         self.assertEqual(normalize("zip", " 63101-1234 "), "63101-1234")
+
+class USAPITest(unittest.TestCase):
+    def test_sec_exact_matching(self):
+        rows = {"0": {"cik_str": 12345, "ticker": "EXM", "title": "Example Corp"}}
+        self.assertEqual(find_sec_ticker(rows, "EXM")["cik_str"], 12345)
+        self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
+        self.assertIsNone(find_sec_ticker(rows, "Example"))
+    def test_census_record(self):
+        self.assertEqual(census_record([["NAME", "B01003_001E"], ["ZCTA5 63101", "1000"]])["B01003_001E"], "1000")
+        self.assertIsNone(census_record([]))
+    def test_balanced_module_flags(self):
+        self.assertTrue(SECCompanyAPI.deep)
+        self.assertTrue(USASpendingRecipientAPI.deep)
+        self.assertFalse(CensusZipAPI.deep)
 
 if __name__ == "__main__":
     unittest.main()
