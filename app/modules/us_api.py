@@ -13,14 +13,31 @@ def exact_company_match(query, candidate):
         return re.sub(r"[^a-z0-9]", "", (s or "").lower())
     return bool(clean(query)) and clean(query) == clean(candidate)
 
+LEGAL_SUFFIXES = {"inc", "incorporated", "llc", "ltd", "limited", "corp", "corporation", "co", "company", "plc"}
+
+def company_core(name):
+    """Normalize leading articles and trailing legal designators, not substantive words."""
+    words = re.findall(r"[a-z0-9]+", (name or "").lower())
+    while words and words[0] == "the":
+        words.pop(0)
+    while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
+        words.pop()
+    return tuple(words)
+
 def find_sec_ticker(rows, name):
     if not isinstance(rows, dict):
         return None
-    for row in rows.values():
-        if isinstance(row, dict) and (exact_company_match(name, row.get("title")) or
-                                      name.upper() == str(row.get("ticker", "")).upper()):
-            return row
-    return None
+    candidates = [row for row in rows.values() if isinstance(row, dict)]
+    # A ticker is an explicit identifier; prefer that over name heuristics.
+    ticker = [r for r in candidates if name.upper() == str(r.get("ticker", "")).upper()]
+    if len(ticker) == 1:
+        return ticker[0]
+    exact = [r for r in candidates if exact_company_match(name, r.get("title"))]
+    if len(exact) == 1:
+        return exact[0]
+    core = company_core(name)
+    normalized = [r for r in candidates if core and company_core(r.get("title")) == core]
+    return normalized[0] if len(normalized) == 1 else None
 
 def is_ticker_like(value):
     return bool(re.fullmatch(r"[A-Z]{2,5}(?:[.-][A-Z])?", value.strip()))
@@ -67,7 +84,7 @@ async def fetch_json(ctx, url, *, method="GET", params=None, json=None, headers=
 class SECCompanyAPI(Module):
     name = "us_sec_api"
     title = "SEC EDGAR live filings"
-    description = "Lookup exact company name or ticker; retrieve CIK and recent filings. Exact matches only."
+    description = "Resolve unique company names or tickers using SEC data, allowing legal suffix variations; retrieve CIK and filings."
     inputs = ("organization",)
     sources = ("SEC EDGAR API",)
     timeout = 45
@@ -86,7 +103,7 @@ class SECCompanyAPI(Module):
             raise Skip("SEC automated lookup blocked or unavailable (HTTP 403/429 or network error); use SEC links manually.")
         company = find_sec_ticker(rows, ctx.value)
         if not company:
-            ctx.message = ctx.message or "No exact SEC company/ticker match; try the company's ticker."
+            ctx.message = ctx.message or "No unique SEC company match; try its ticker or registered legal name."
             return
         cik = int(company["cik_str"])
         url = f"https://data.sec.gov/submissions/CIK{cik:010d}.json"
@@ -103,7 +120,7 @@ class SECCompanyAPI(Module):
                   for f, a, d in list(zip(forms, accessions, dates))[:12]]
         ctx.enrich({"SEC CIK": str(cik), "SEC ticker": company.get("ticker"),
                     "SEC filing name": data.get("name"), "SEC recent filings": recent,
-                    "SEC evidence": url, "SEC matching": "Exact name or ticker; verify legal entity",
+                    "SEC evidence": url, "SEC matching": "Unique ticker, exact name, or normalized legal suffix match; verify legal entity",
                     "_links": [["SEC filings", f"https://www.sec.gov/edgar/browse/?CIK={cik}"],
                                ["SEC submissions JSON", url]]})
         ctx.found += 1
