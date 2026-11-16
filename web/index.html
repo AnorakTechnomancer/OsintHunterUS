@@ -40,6 +40,15 @@
           <option value="2">+2 saltos automáticos</option>
         </select>
       </div>
+      <div id="peopleLocationFields" class="people-location-fields" hidden>
+        <label for="peopleCity">People search location (optional)</label>
+        <div class="row">
+          <input id="peopleCity" autocomplete="address-level2" placeholder="City" maxlength="100">
+          <input id="peopleState" autocomplete="address-level1" placeholder="State (e.g. IL)" maxlength="30">
+          <input id="peopleZip" autocomplete="postal-code" placeholder="ZIP" inputmode="numeric" maxlength="10">
+        </div>
+        <div class="muted small">First and last name required. City, state, and ZIP help narrow namesakes; all are optional.</div>
+      </div>
       <button type="submit" class="primary">Investigar</button>
       <label class="upload-btn">Analizar imagen (EXIF / GPS)
         <input type="file" id="imageInput" accept="image/*" hidden>
