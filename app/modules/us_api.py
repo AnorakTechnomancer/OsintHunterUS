@@ -56,7 +56,7 @@ class SECCompanyAPI(Module):
     inputs = ("organization",)
     sources = ("SEC EDGAR API",)
     timeout = 45
-    deep = True
+    deep = False
 
     async def run(self, ctx):
         agent = (ctx.settings.get("sec_user_agent") or "").strip()
@@ -92,7 +92,7 @@ class USASpendingRecipientAPI(Module):
     inputs = ("organization",)
     sources = ("USAspending API",)
     timeout = 30
-    deep = True
+    deep = False
 
     async def run(self, ctx):
         query = ctx.value.strip()
