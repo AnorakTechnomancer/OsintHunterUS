@@ -83,6 +83,12 @@ class Settings:
 
     def update(self, changes: dict) -> None:
         with self._lock:
+            agent = changes.get("sec_user_agent")
+            if agent is not None:
+                agent = str(agent or "").strip()
+                if agent and ("@" not in agent or len(agent) > 200 or "\\n" in agent or "\\r" in agent):
+                    raise ValueError("SEC User-Agent must contain a contact email and be at most 200 characters.")
+                changes["sec_user_agent"] = agent
             keys = dict(self.data.get("api_keys") or {})
             for k, v in (changes.pop("api_keys", None) or {}).items():
                 if k not in API_KEYS:
@@ -94,10 +100,6 @@ class Settings:
                     keys.pop(k, None)
             self.data["api_keys"] = keys
             for k, v in changes.items():
-                if k == "sec_user_agent":
-                    v = str(v or "").strip()
-                    if v and ("@" not in v or len(v) > 200 or "\\n" in v or "\\r" in v):
-                        raise ValueError("SEC User-Agent must contain a contact email and be at most 200 characters.")
                 if k in DEFAULT_SETTINGS and k != "api_keys":
                     self.data[k] = v
             self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
