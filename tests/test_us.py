@@ -4,6 +4,17 @@ from app.models import detect_type, normalize
 from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI, is_ticker_like, recipient_matches, company_core
 
 class USInputsTest(unittest.TestCase):
+    def test_us_person_dorks_have_no_chilean_fallback(self):
+        from unittest.mock import patch
+        from app.modules.misc import dorks_for
+        with patch("app.modules.misc.settings.get", return_value="US"):
+            rows = dorks_for("person", "Jane Example")
+        labels = " ".join(str(row[0]) + " " + str(row[2]) for row in rows)
+        self.assertIn("US official sources", labels)
+        self.assertNotIn("Chile", labels)
+        self.assertNotIn("Argentina", labels)
+        self.assertNotIn("RUT", labels)
+        self.assertTrue(any("fec.gov" in row[1] for row in rows))
     def test_zip(self):
         self.assertEqual(normalize_us_zip("63101"), "63101")
         self.assertEqual(normalize_us_zip("63101-1234"), "63101-1234")
