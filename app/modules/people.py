@@ -87,6 +87,7 @@ class Academic(Module):
     title = "Publicaciones académicas (OpenAlex, ORCID)"
     description = "Artículos, tesis y patentes firmados con ese nombre: afiliación, coautores, temas y ORCID"
     inputs = ("person",)
+    deep = True  # Academic profiles are opt-in, not default people-search evidence.
     sources = ("api.openalex.org", "pub.orcid.org")
 
     async def run(self, ctx):
@@ -120,11 +121,6 @@ class Academic(Module):
             })
             ctx.found += len(matches)
             return
-        if len(matches) > 1:
-            ctx.enrich({"OpenAlex: autores con este nombre": [
-                f"{a['display_name']} · {a.get('works_count', 0)} trabajos · "
-                + ", ".join(i.get("display_name", "") for i in a.get("last_known_institutions") or [])[:80]
-                for a in matches[:8]]})
         # A shared name is not evidence that an academic author is the searched person.
         # Keep each result as an unverified candidate; never attach the top author's
         # publications, metrics, ORCID or affiliations to the searched identity.
@@ -200,6 +196,7 @@ class Wikidata(Module):
     description = ("Si la persona es pública: fecha y lugar de nacimiento, cargos, estudios, familia, "
                    "web y redes oficiales")
     inputs = ("person",)
+    deep = True  # Public-figure research is opt-in.
     sources = ("wikidata.org",)
 
     async def run(self, ctx):
@@ -228,7 +225,7 @@ class Wikidata(Module):
                   if any(v.get("id") == "Q5" for v in _claims(e, "P31") if isinstance(v, dict))]
         if not humans:
             return
-        desc = lambda e: ((e.get("descriptions") or {}).get("es") or (e.get("descriptions") or {}).get("en") or {}).get("value", "")  # noqa: E731
+        desc = lambda e: ((e.get("descriptions") or {}).get("en") or (e.get("descriptions") or {}).get("es") or {}).get("value", "")  # noqa: E731
         # Even one Wikidata result is only a name match, not verified identity.
         label = lambda ent: ((ent.get("labels") or {}).get("en") or (ent.get("labels") or {}).get("es") or {}).get("value", "")
         key = "Wikidata candidate people (unverified)"
