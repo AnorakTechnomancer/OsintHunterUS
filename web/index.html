@@ -161,6 +161,14 @@
         <label>Modelo <input name="ai_model" placeholder="llama3.1"></label>
       </div>
     </div>
+    <h3>US government data sources</h3>
+    <p class="muted small">SEC EDGAR requires an identified contact for automated requests. No SEC API key is required. Configure this here rather than editing JSON files.</p>
+    <div class="settings-grid">
+      <label>SEC EDGAR User-Agent (organization and contact email)
+        <input name="sec_user_agent" type="text" placeholder="OsintHunterUS Research contact@example.com" autocomplete="off">
+        <small><a href="https://www.sec.gov/search-filings/edgar-application-programming-interfaces" target="_blank" rel="noopener noreferrer">SEC API documentation</a></small>
+      </label>
+    </div>
     <h3>Claves API</h3>
     <p class="muted small">Todas opcionales. Se guardan sólo en tu PC (carpeta <code>data</code>). Sin clave, esa fuente se omite y se indica en «Fuentes consultadas».</p>
     <div id="keysList" class="keys-list"></div>
