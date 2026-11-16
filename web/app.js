@@ -1735,6 +1735,7 @@ async function openSettings() {
   f.max_pivot_entities.value = s.max_pivot_entities;
   f.sherlock_db.checked = !!s.sherlock_db;
   f.include_nsfw.checked = !!s.include_nsfw;
+  f.sec_user_agent.value = s.sec_user_agent || "";
   f.ai_base_url.value = s.ai_base_url || "";
   f.ai_model.value = s.ai_model || "";
   syncAiPreset();
@@ -1784,6 +1785,7 @@ $("#saveSettingsBtn").addEventListener("click", async (ev) => {
       max_pivot_entities: Number(f.max_pivot_entities.value) || 25,
       sherlock_db: f.sherlock_db.checked,
       include_nsfw: f.include_nsfw.checked,
+      sec_user_agent: f.sec_user_agent.value.trim(),
       ai_base_url: f.ai_base_url.value.trim(),
       ai_model: f.ai_model.value.trim(),
       api_keys,
