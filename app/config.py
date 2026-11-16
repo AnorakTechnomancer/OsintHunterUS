@@ -54,12 +54,12 @@ DEFAULT_SETTINGS = {
     "api_keys": {},
     "ai_base_url": "",
     "ai_model": "",
-    "default_region": "",
+    "default_region": "US",
     "sherlock_db": True,
     "include_nsfw": False,
     "username_timeout": 15,
     "max_pivot_entities": 25,
-    "lang": "es",
+    "lang": "en",
 }
 
 
