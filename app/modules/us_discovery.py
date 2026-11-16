@@ -45,15 +45,26 @@ class USPeoplePublicResearch(Module):
 
     async def run(self, ctx):
         name = " ".join(ctx.value.split())
-        if len(name) < 4:
+        if len(name.split()) < 2:
+            ctx.message = "Enter at least a first and last name."
             return
+        attrs = ctx.entity.get("attrs") or {}
+        city = str(attrs.get("Search city") or "").strip()[:100]
+        state = str(attrs.get("Search state") or "").strip()[:30]
+        zipcode = str(attrs.get("Search ZIP") or "").strip()[:10]
+        location = " ".join(x for x in (city, state, zipcode) if x)
+        query = f'"{name}"' + (f' "{location}"' if location else "")
         links = [
-            ["Public professional profiles", google(f'"{name}" (site:linkedin.com/in/ OR site:github.com OR site:scholar.google.com)')],
-            ["Public publications", "https://scholar.google.com/scholar?" + urlencode({"q": f'"{name}"'})],
-            ["Public web references", google(f'"{name}"')],
-            ["Public historical web mentions", google(f'"{name}" archive OR historical')],
-            ["FEC public finance data", "https://www.fec.gov/data/"],
+            ["Public web mentions" + (" near location" if location else ""), google(query)],
+            ["Professional profiles", google(query + " (site:linkedin.com/in/ OR site:github.com)")],
+            ["Public publications", "https://scholar.google.com/scholar?" + urlencode({"q": query})],
+            ["Historical web mentions", google(query + " archive OR historical")],
+            ["Public news mentions", google(query + " news OR interview")],
+            ["FEC public finance search", "https://www.fec.gov/data/"],
+            ["FamilyTreeNow manual lookup", "https://www.familytreenow.com/"],
         ]
-        ctx.enrich({"People research": "Search leads only; namesakes are common. Confirm identity before linking.",
+        ctx.enrich({"People search query": name,
+                    "People search location hint": location or "None (nationwide)",
+                    "People research": "Unverified public-source leads; namesakes and location matches do not establish identity.",
                     "_links": links})
         ctx.found += len(links)
