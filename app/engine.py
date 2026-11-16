@@ -263,10 +263,48 @@ class Engine:
             db.touch(job.case_id)
             job.finish()
 
+    def _clean_legacy_person_attribution(self, job: Job, ent: dict) -> dict:
+        """Remove obsolete auto-attributed academic identity data, not user fields."""
+        if ent["type"] != "person":
+            return ent
+        attrs = ent.get("attrs") or {}
+        # Legacy module-owned keys were merged into the person, incorrectly
+        # implying that the first matching author was the searched individual.
+        legacy = {
+            "Wikidata: personas con este nombre",
+            "OpenAlex: autores con este nombre",
+            "OpenAlex: autores con nombre parecido",
+            "OpenAlex: works", "OpenAlex: citations", "OpenAlex: h-index",
+            "Research topics", "Affiliation (OpenAlex)", "ORCID",
+            "Publicaciones destacadas", "Coautores frecuentes",
+            "ORCID: perfiles con este nombre",
+        }
+        remove = {k: None for k in attrs if k in legacy}
+        # Only remove links to automatically selected academic identities;
+        # preserve manually entered links and all unrelated source links.
+        links = attrs.get("_links")
+        if isinstance(links, list):
+            filtered = [link for link in links if not (
+                isinstance(link, (list, tuple)) and len(link) > 1
+                and isinstance(link[1], str)
+                and ("openalex.org/authors/" in link[1] or "orcid.org/" in link[1]
+                     or "wikidata.org/wiki/" in link[1])
+            )]
+            if len(filtered) != len(links):
+                remove["_links"] = filtered
+        if not remove:
+            return ent
+        updated = db.update_attrs(job.case_id, ent["id"], remove, replace=True)
+        if updated:
+            job.emit({"type": "entity", "entity": updated, "created": False})
+        return updated or ent
+
     async def _scan_entity(self, job: Job, eid: str, modules: list[str] | None, rerun: bool) -> list[str]:
         ent = db.get_entity(job.case_id, eid)
         if not ent:
             return []
+        if rerun:
+            ent = self._clean_legacy_person_attribution(job, ent)
         mods = self.modules_for(ent)
         if modules is not None:
             mods = [m for m in mods if m.name in modules]
