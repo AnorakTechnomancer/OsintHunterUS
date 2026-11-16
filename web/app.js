@@ -355,6 +355,15 @@ const detectSoon = debounce(async () => {
   try { fillTypeSelect((await api("/api/detect", { method: "POST", body: { value: v } })).type); } catch { /* ignorar */ }
 }, 250);
 $("#searchInput").addEventListener("input", detectSoon);
+function updatePeopleLocationVisibility() {
+  const selected = $("#typeSelect").value;
+  const value = $("#searchInput").value.trim();
+  const likelyPerson = selected === "person" || (!selected && value.includes(" "));
+  $("#peopleLocationFields").hidden = !likelyPerson;
+}
+$("#searchInput").addEventListener("input", updatePeopleLocationVisibility);
+$("#typeSelect").addEventListener("change", updatePeopleLocationVisibility);
+
 
 $("#searchForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -362,7 +371,18 @@ $("#searchForm").addEventListener("submit", async (ev) => {
   if (!value) return;
   try {
     await ensureCase(value);
-    const ent = await api(`/api/cases/${S.caseId}/entities`, { method: "POST", body: { value, type: $("#typeSelect").value || null } });
+    const type = $("#typeSelect").value || null;
+    const personSearch = type === "person" || (!type && value.includes(" ") && !/\\b(?:Inc|LLC|Corp|Company|Ltd)\\.?$/i.test(value));
+    const attrs = {};
+    if (personSearch) {
+      const city = $("#peopleCity").value.trim();
+      const state = $("#peopleState").value.trim();
+      const zip = $("#peopleZip").value.trim();
+      if (city) attrs["Search city"] = city;
+      if (state) attrs["Search state"] = state;
+      if (zip) attrs["Search ZIP"] = zip;
+    }
+    const ent = await api(`/api/cases/${S.caseId}/entities`, { method: "POST", body: { value, type, attrs } });
     upsertNode(ent);
     renderLegend();
     select(ent.id);
@@ -371,6 +391,7 @@ $("#searchForm").addEventListener("submit", async (ev) => {
     $("#searchInput").value = "";
     $("#typeSelect").value = "";
     fillTypeSelect(null);
+    updatePeopleLocationVisibility();
     loadCases();
   } catch (e) { toast(e.message, true); }
 });
