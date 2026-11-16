@@ -20,6 +20,8 @@ class USInputsTest(unittest.TestCase):
         self.assertEqual(detect_type("example.com"), "domain")
         self.assertEqual(detect_type("203.0.113.9"), "ip")
         self.assertEqual(detect_type("Jane Example"), "person")
+        self.assertEqual(detect_type("AAPL"), "organization")
+        self.assertEqual(detect_type("Boeing Inc"), "organization")
     def test_normalize(self):
         self.assertEqual(normalize("ein", "123456789"), "12-3456789")
         self.assertEqual(normalize("zip", " 63101-1234 "), "63101-1234")
@@ -34,8 +36,8 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(census_record([["NAME", "B01003_001E"], ["ZCTA5 63101", "1000"]])["B01003_001E"], "1000")
         self.assertIsNone(census_record([]))
     def test_balanced_module_flags(self):
-        self.assertTrue(SECCompanyAPI.deep)
-        self.assertTrue(USASpendingRecipientAPI.deep)
+        self.assertFalse(SECCompanyAPI.deep)
+        self.assertFalse(USASpendingRecipientAPI.deep)
         self.assertFalse(CensusZipAPI.deep)
 
 if __name__ == "__main__":
