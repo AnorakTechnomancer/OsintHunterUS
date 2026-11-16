@@ -31,7 +31,8 @@ class USAPITest(unittest.TestCase):
         rows = {"0": {"cik_str": 12345, "ticker": "EXM", "title": "Example Corp"}}
         self.assertEqual(find_sec_ticker(rows, "EXM")["cik_str"], 12345)
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
-        self.assertIsNone(find_sec_ticker(rows, "Example"))
+        self.assertEqual(find_sec_ticker(rows, "Example")["ticker"], "EXM")
+        self.assertIsNone(find_sec_ticker(rows, "Example Holdings"))
     def test_sec_legal_name_variants(self):
         rows = {"0": {"cik_str": 12927, "ticker": "BA", "title": "THE BOEING COMPANY"},
                 "1": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
