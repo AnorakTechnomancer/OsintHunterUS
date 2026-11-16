@@ -69,7 +69,7 @@ def detect_type(value: str) -> str:
         return "hash"
     if re.fullmatch(r"[A-Z]{2,5}", v):
         return "organization"  # Uppercase ticker candidate; user can override type.
-    if re.search(r"\\b(?:Inc\\.?|LLC|Corp\\.?|Corporation|Ltd\\.?|Company|Co\\.?)$", v, re.I):
+    if re.search(r"\b(?:Inc\.?|LLC|Corp\.?|Corporation|Ltd\.?|Company|Co\.?)$", v, re.I):
         return "organization"
     if _EIN.fullmatch(v):
         return "ein"
