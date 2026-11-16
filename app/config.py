@@ -42,12 +42,12 @@ API_KEYS: dict[str, tuple[str, str]] = {
     "abusech": ("abuse.ch Auth-Key (URLhaus, ThreatFox, MalwareBazaar)", "https://auth.abuse.ch/"),
     "urlscan": ("URLScan.io", "https://urlscan.io/user/profile/"),
     "greynoise": ("GreyNoise Community", "https://viz.greynoise.io/account/api-key"),
-    "github": ("GitHub token (sube el límite de 60 a 5000 peticiones/h)", "https://github.com/settings/tokens"),
+    "github": ("GitHub token (increases API rate limit)", "https://github.com/settings/tokens"),
     "numverify": ("Numverify", "https://numverify.com/product"),
-    "hibp": ("Have I Been Pwned (de pago)", "https://haveibeenpwned.com/API/Key"),
-    "serper": ("Serper.dev (Google; 2500 búsquedas gratis, mejora la búsqueda de personas)", "https://serper.dev/api-key"),
-    "brave": ("Brave Search API (alternativa a Serper)", "https://api-dashboard.search.brave.com/app/keys"),
-    "ai": ("Clave del proveedor de IA (no hace falta con Ollama local)", "https://console.groq.com/keys"),
+    "hibp": ("Have I Been Pwned (paid API)", "https://haveibeenpwned.com/API/Key"),
+    "serper": ("Serper.dev (Google search API; free tier available)", "https://serper.dev/api-key"),
+    "brave": ("Brave Search API (Serper alternative)", "https://api-dashboard.search.brave.com/app/keys"),
+    "ai": ("AI provider key (not required for local Ollama)", "https://console.groq.com/keys"),
 }
 
 DEFAULT_SETTINGS = {
