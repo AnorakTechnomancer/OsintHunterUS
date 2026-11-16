@@ -6,8 +6,6 @@
 
 <br>
 
-[![Release](https://img.shields.io/github/v/release/letox4/OsintHunter?style=for-the-badge&color=ff7a1a&labelColor=0d0a07&logo=github)](https://github.com/letox4/OsintHunter/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/letox4/OsintHunter/total?style=for-the-badge&color=ff7a1a&labelColor=0d0a07&logo=windows)](https://github.com/letox4/OsintHunter/releases)
 [![Python](https://img.shields.io/badge/Python-3.11+-ff7a1a?style=for-the-badge&labelColor=0d0a07&logo=python&logoColor=ffb066)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-ff7a1a?style=for-the-badge&labelColor=0d0a07&logo=fastapi&logoColor=ffb066)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-ff7a1a?style=for-the-badge&labelColor=0d0a07)](LICENSE)
@@ -20,7 +18,7 @@
 
 ### ${\color{#ff7a1a}\textsf{Find.\ Connect.\ Confirm.}}$
 
-**Desktop OSINT platform** that starts from a username, email, phone, name, domain, IP, ZIP or EIN<br>
+**US-focused fork of [letox4/OsintHunter](https://github.com/letox4/OsintHunter). Desktop OSINT platform** that starts from a username, email, phone, name, domain, IP, ZIP or EIN<br>
 and builds an **investigation graph** with confidence scoring, a map, a timeline and a report.
 
 [**🇺🇸 US research guide**](docs/US_RESEARCH.md) ·
