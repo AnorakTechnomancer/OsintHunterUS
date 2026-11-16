@@ -3,7 +3,7 @@ import re
 
 from .base import Module, Skip, register
 
-SEC_HEADERS = {"Accept": "application/json"}
+SEC_HEADERS = {"Accept": "*/*", "Accept-Language": "en-US,en;q=0.9"}
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
 USA_AUTOCOMPLETE = "https://api.usaspending.gov/api/v2/autocomplete/recipient/"
 CENSUS_ACS = "https://api.census.gov/data/2024/acs/acs5"
