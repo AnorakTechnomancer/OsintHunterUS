@@ -242,3 +242,10 @@ dialog h3 { margin: 18px 0 4px; font-family: var(--display); letter-spacing: .5p
 ::-webkit-scrollbar-thumb { background: #3a2c1f; border-radius: 6px; border: 2px solid var(--panel); }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* Compact, accessible disclosure sections for secondary people-search findings. */
+.detail-fold { margin-top: 10px; }
+.detail-fold > summary { cursor: pointer; font-weight: 600; padding: 8px 4px; list-style-position: inside; }
+.detail-fold > summary:hover { opacity: .85; }
+.detail-fold[open] > summary { margin-bottom: 8px; }
+.detail-fold .attrs { width: 100%; }
