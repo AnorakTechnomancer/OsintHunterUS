@@ -12,8 +12,9 @@ ENTITY_TYPES: dict[str, dict] = {
     "url": {"label": "URL", "color": "#90a4ae", "shape": "round-tag", "input": True},
     "hash": {"label": "Hash", "color": "#a1887f", "shape": "rectangle", "input": True},
     "crypto": {"label": "Cripto", "color": "#ffd54f", "shape": "octagon", "input": True},
-    "rut": {"label": "RUT", "color": "#ff8a65", "shape": "round-pentagon", "input": True},
-    "plate": {"label": "Patente", "color": "#dce775", "shape": "cut-rectangle", "input": True},
+    "ein": {"label": "EIN", "color": "#ff8a65", "shape": "round-pentagon", "input": True},
+    "zip": {"label": "ZIP code", "color": "#a5d6a7", "shape": "round-rectangle", "input": True},
+    "plate": {"label": "License plate", "color": "#dce775", "shape": "cut-rectangle", "input": True},
     "account": {"label": "Cuenta", "color": "#4db6ac", "shape": "round-rectangle", "input": False},
     "location": {"label": "Ubicación", "color": "#aed581", "shape": "triangle", "input": False},
     "organization": {"label": "Organización", "color": "#7986cb", "shape": "barrel", "input": False},
@@ -23,9 +24,10 @@ ENTITY_TYPES: dict[str, dict] = {
 }
 
 # Tipos que el pivotado automático (profundidad > 0) vuelve a investigar.
-AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto", "rut"}
+AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto", "ein"}
 
-_RUT = re.compile(r"^\d{1,2}(?:\.\d{3}){2}-?[\dkK]$|^\d{7,8}-[\dkK]$")
+_EIN = re.compile(r"^\d{2}-\d{7}$")
+_ZIP = re.compile(r"^\d{5}(?:-\d{4})?$")
 _PLATE_SEP = re.compile(r"^[A-Za-z]{2}[\s.\-·•][A-Za-z]{2}[\s.\-·•]?\d{2}$|^[A-Za-z]{2,4}[\s.\-·•]\d{2,4}$")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
@@ -65,13 +67,11 @@ def detect_type(value: str) -> str:
         return "crypto"
     if _HEX.match(v) and len(v) in (32, 40, 56, 64, 96, 128):
         return "hash"
-    from .modules.chile import plate_kind
-
-    if _RUT.match(v):
-        return "rut"
-    # sin separadores sólo en mayúsculas, para no confundir con usuarios tipo «abcd12»
-    if plate_kind(v) and (_PLATE_SEP.match(v) or (v.isupper() and re.fullmatch(r"[A-Z]{4}\d{2}|[A-Z]{2}\d{4}", v))):
-        return "plate"
+    if _EIN.fullmatch(v):
+        return "ein"
+    if _ZIP.fullmatch(v):
+        return "zip"
+    # US plate formats differ by state; select the plate entity type manually.
     digits = re.sub(r"\D", "", v)
     if _PHONE.match(v) and 7 <= len(digits) <= 15 and (v.startswith("+") or not re.search(r"[a-z]", v, re.I)):
         return "phone"
@@ -101,15 +101,13 @@ def normalize(etype: str, value: str) -> str:
         v = " ".join(v.split()).title()
     elif etype == "account":
         v = v.rstrip("/")
-    elif etype == "rut":
-        from .modules.chile import rut_fmt, rut_parts
-
-        p = rut_parts(v)
-        v = rut_fmt(*p) if p else v.upper()
+    elif etype == "ein":
+        from .modules.us import normalize_ein
+        v = normalize_ein(v) or v
+    elif etype == "zip":
+        v = v.strip()
     elif etype == "plate":
-        from .modules.chile import plate_clean
-
-        v = plate_clean(v)
+        v = re.sub(r"[\s-]", "", v).upper()
     return v
 
 
@@ -128,8 +126,4 @@ def display_label(etype: str, value: str, attrs: dict) -> str:
         return f"{value} {attrs['Organización']}"
     if etype == "image" and attrs.get("Archivo"):
         return attrs["Archivo"]
-    if etype == "plate":
-        from .modules.chile import plate_display
-
-        return plate_display(value)
     return value
