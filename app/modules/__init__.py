@@ -1,4 +1,4 @@
 from .base import REGISTRY, Module, Skip, register
-from . import username, email, phone, domain, ip, web, misc, enrich, deep, documents, people, websearch, us, us_api  # noqa: F401,E402  (registran módulos)
+from . import username, email, phone, domain, ip, web, misc, enrich, deep, documents, people, websearch, us, us_api, us_discovery  # noqa: F401,E402  (registran módulos)
 
 __all__ = ["REGISTRY", "Module", "Skip", "register"]
