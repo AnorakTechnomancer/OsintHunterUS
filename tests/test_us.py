@@ -33,6 +33,15 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
         self.assertEqual(find_sec_ticker(rows, "Example")["ticker"], "EXM")
         self.assertIsNone(find_sec_ticker(rows, "Example Holdings"))
+    def test_public_profile_candidate_matching(self):
+        from app.modules.us_people_candidates import name_matches, location_matches
+        self.assertTrue(name_matches("Nathaniel Miller", "Nathaniel E. Miller"))
+        self.assertFalse(name_matches("Nathaniel Miller", "Nathan R. Miller"))
+        self.assertEqual(location_matches("Granite City", "IL", "", "Granite City, IL"),
+                         "self-reported location overlap")
+        self.assertEqual(location_matches("Granite City", "IL", "", "Austin, TX"),
+                         "not established")
+
     def test_academic_sources_are_opt_in(self):
         from app.modules.people import Academic, Wikidata
         self.assertTrue(Academic.deep)
