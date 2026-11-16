@@ -3,28 +3,28 @@ import re
 
 # tipo -> (nombre visible, color, forma en el grafo, ¿se puede investigar directamente?)
 ENTITY_TYPES: dict[str, dict] = {
-    "username": {"label": "Usuario", "color": "#4fc3f7", "shape": "ellipse", "input": True},
+    "username": {"label": "Username", "color": "#4fc3f7", "shape": "ellipse", "input": True},
     "email": {"label": "Email", "color": "#ffb74d", "shape": "round-rectangle", "input": True},
-    "phone": {"label": "Teléfono", "color": "#81c784", "shape": "round-rectangle", "input": True},
-    "person": {"label": "Persona", "color": "#f06292", "shape": "ellipse", "input": True},
-    "domain": {"label": "Dominio", "color": "#ba68c8", "shape": "hexagon", "input": True},
+    "phone": {"label": "Phone", "color": "#81c784", "shape": "round-rectangle", "input": True},
+    "person": {"label": "Person", "color": "#f06292", "shape": "ellipse", "input": True},
+    "domain": {"label": "Domain", "color": "#ba68c8", "shape": "hexagon", "input": True},
     "ip": {"label": "IP", "color": "#e57373", "shape": "diamond", "input": True},
     "url": {"label": "URL", "color": "#90a4ae", "shape": "round-tag", "input": True},
     "hash": {"label": "Hash", "color": "#a1887f", "shape": "rectangle", "input": True},
-    "crypto": {"label": "Cripto", "color": "#ffd54f", "shape": "octagon", "input": True},
+    "crypto": {"label": "Crypto", "color": "#ffd54f", "shape": "octagon", "input": True},
     "ein": {"label": "EIN", "color": "#ff8a65", "shape": "round-pentagon", "input": True},
     "zip": {"label": "ZIP code", "color": "#a5d6a7", "shape": "round-rectangle", "input": True},
     "plate": {"label": "License plate", "color": "#dce775", "shape": "cut-rectangle", "input": True},
-    "account": {"label": "Cuenta", "color": "#4db6ac", "shape": "round-rectangle", "input": False},
-    "location": {"label": "Ubicación", "color": "#aed581", "shape": "triangle", "input": False},
-    "organization": {"label": "Organización", "color": "#7986cb", "shape": "barrel", "input": False},
+    "account": {"label": "Account", "color": "#4db6ac", "shape": "round-rectangle", "input": False},
+    "location": {"label": "Location", "color": "#aed581", "shape": "triangle", "input": False},
+    "organization": {"label": "Organization", "color": "#7986cb", "shape": "barrel", "input": True},
     "asn": {"label": "ASN", "color": "#9575cd", "shape": "barrel", "input": False},
-    "breach": {"label": "Filtración", "color": "#ef5350", "shape": "star", "input": False},
-    "image": {"label": "Imagen", "color": "#4dd0e1", "shape": "rectangle", "input": False},
+    "breach": {"label": "Breach", "color": "#ef5350", "shape": "star", "input": False},
+    "image": {"label": "Image", "color": "#4dd0e1", "shape": "rectangle", "input": False},
 }
 
 # Tipos que el pivotado automático (profundidad > 0) vuelve a investigar.
-AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto", "ein"}
+AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto"}
 
 _EIN = re.compile(r"^\d{2}-\d{7}$")
 _ZIP = re.compile(r"^\d{5}(?:-\d{4})?$")
@@ -67,6 +67,10 @@ def detect_type(value: str) -> str:
         return "crypto"
     if _HEX.match(v) and len(v) in (32, 40, 56, 64, 96, 128):
         return "hash"
+    if re.fullmatch(r"[A-Z]{2,5}", v):
+        return "organization"  # Uppercase ticker candidate; user can override type.
+    if re.search(r"\\b(?:Inc\\.?|LLC|Corp\\.?|Corporation|Ltd\\.?|Company|Co\\.?)$", v, re.I):
+        return "organization"
     if _EIN.fullmatch(v):
         return "ein"
     if _ZIP.fullmatch(v):
