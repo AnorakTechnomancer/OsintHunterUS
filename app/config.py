@@ -52,6 +52,7 @@ API_KEYS: dict[str, tuple[str, str]] = {
 
 DEFAULT_SETTINGS = {
     "api_keys": {},
+    "sec_user_agent": "",
     "ai_base_url": "",
     "ai_model": "",
     "default_region": "US",
