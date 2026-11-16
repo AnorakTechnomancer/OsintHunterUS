@@ -352,7 +352,7 @@ function fillTypeSelect(detected) {
 const detectSoon = debounce(async () => {
   const v = $("#searchInput").value.trim();
   if (!v) return fillTypeSelect(null);
-  try { fillTypeSelect((await api("/api/detect", { method: "POST", body: { value: v } })).type); } catch { /* ignorar */ }
+  try { fillTypeSelect((await api("/api/detect", { method: "POST", body: { value: v } })).type); updatePeopleLocationVisibility(); } catch { /* ignore */ }
 }, 250);
 $("#searchInput").addEventListener("input", detectSoon);
 function updatePeopleLocationVisibility() {
