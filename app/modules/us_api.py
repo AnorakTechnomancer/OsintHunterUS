@@ -83,8 +83,7 @@ class SECCompanyAPI(Module):
             ctx.enrich({"SEC status": "Automated SEC lookup unavailable; no company identity verified.",
                         "_links": [["SEC EDGAR company search", "https://www.sec.gov/edgar/search/"],
                                    ["SEC company/ticker search", "https://www.sec.gov/edgar/browse/"]]})
-            ctx.message = "SEC denied or throttled automated access. Check contact User-Agent and network; use SEC search links manually."
-            return
+            raise Skip("SEC automated lookup blocked or unavailable (HTTP 403/429 or network error); use SEC links manually.")
         company = find_sec_ticker(rows, ctx.value)
         if not company:
             ctx.message = ctx.message or "No exact SEC company/ticker match; try the company's ticker."
@@ -93,7 +92,11 @@ class SECCompanyAPI(Module):
         url = f"https://data.sec.gov/submissions/CIK{cik:010d}.json"
         data = await fetch_json(ctx, url, headers=headers)
         if not isinstance(data, dict):
-            return
+            ctx.enrich({"SEC ticker": company.get("ticker"), "SEC CIK": str(cik),
+                        "SEC filing name": company.get("title"),
+                        "SEC evidence": SEC_TICKERS,
+                        "_links": [["SEC EDGAR filings", f"https://www.sec.gov/edgar/browse/?CIK={cik}"]]})
+            raise Skip("SEC company resolved but submissions endpoint blocked or unavailable; recent filings not retrieved.")
         filings = (data.get("filings") or {}).get("recent") or {}
         forms, accessions, dates = (filings.get(k) or [] for k in ("form", "accessionNumber", "filingDate"))
         recent = [{"form": f, "filed": d, "accession": a}
