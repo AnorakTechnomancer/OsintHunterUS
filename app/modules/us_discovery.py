@@ -53,7 +53,7 @@ class USPeoplePublicResearch(Module):
         state = str(attrs.get("Search state") or "").strip()[:30]
         zipcode = str(attrs.get("Search ZIP") or "").strip()[:10]
         location = " ".join(x for x in (city, state, zipcode) if x)
-        query = f'"{name}"' + (f' "{location}"' if location else "")
+        query = f'"{name}"' + (f" {location}" if location else "")
         links = [
             ["Public web mentions" + (" near location" if location else ""), google(query)],
             ["Professional profiles", google(query + " (site:linkedin.com/in/ OR site:github.com)")],
