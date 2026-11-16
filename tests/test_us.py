@@ -1,7 +1,7 @@
 import unittest
 from app.modules.us import normalize_ein, normalize_us_zip
 from app.models import detect_type, normalize
-from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI, is_ticker_like, recipient_matches
+from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI, is_ticker_like, recipient_matches, company_core
 
 class USInputsTest(unittest.TestCase):
     def test_zip(self):
@@ -32,6 +32,18 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(find_sec_ticker(rows, "EXM")["cik_str"], 12345)
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
         self.assertIsNone(find_sec_ticker(rows, "Example"))
+    def test_sec_legal_name_variants(self):
+        rows = {"0": {"cik_str": 12927, "ticker": "BA", "title": "THE BOEING COMPANY"},
+                "1": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
+        self.assertEqual(company_core("Boeing Inc"), ("boeing",))
+        self.assertEqual(find_sec_ticker(rows, "Boeing Inc")["ticker"], "BA")
+        self.assertEqual(find_sec_ticker(rows, "The Boeing Company")["ticker"], "BA")
+        self.assertEqual(find_sec_ticker(rows, "BA")["cik_str"], 12927)
+        self.assertIsNone(find_sec_ticker(rows, "Boeing Aerospace"))
+        ambiguous = {"0": {"ticker": "X", "title": "Example Inc"},
+                     "1": {"ticker": "Y", "title": "The Example Company"}}
+        self.assertIsNone(find_sec_ticker(ambiguous, "Example LLC"))
+
     def test_recipient_filtering(self):
         self.assertTrue(is_ticker_like("AAPL"))
         self.assertFalse(is_ticker_like("Boeing Inc"))
