@@ -94,6 +94,10 @@ class Settings:
                     keys.pop(k, None)
             self.data["api_keys"] = keys
             for k, v in changes.items():
+                if k == "sec_user_agent":
+                    v = str(v or "").strip()
+                    if v and ("@" not in v or len(v) > 200 or "\\n" in v or "\\r" in v):
+                        raise ValueError("SEC User-Agent must contain a contact email and be at most 200 characters.")
                 if k in DEFAULT_SETTINGS and k != "api_keys":
                     self.data[k] = v
             self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False), encoding="utf-8")
