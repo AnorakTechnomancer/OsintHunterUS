@@ -4,10 +4,10 @@ These modules do not scrape people-search aggregators, pull private records,
 or equate matching names with matching identities. Links are research leads.
 """
 import re
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from .base import Module, register
 
-STATE_CODES = set("""AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC""".split())
+
 
 def normalize_us_zip(value: str) -> str | None:
     value = (value or "").strip()
@@ -94,7 +94,7 @@ class USZipInfo(Module):
 class USEinInfo(Module):
     name = "us_ein_info"
     title = "US employer identification number (EIN)"
-    description = "Format-only EIN inspection and official research links; does not validate issuance or ownership."
+    description = "Format-only EIN inspection with official IRS and SEC research links; it cannot verify issuance or identify a business automatically."
     inputs = ("ein",)
     sources = ("IRS", "SEC EDGAR")
 
@@ -108,6 +108,7 @@ class USEinInfo(Module):
                         research_link("IRS nonprofit search", "https://apps.irs.gov/app/eos/", [["EIN", ein]]),
                         research_link("SEC EDGAR filings", "https://www.sec.gov/edgar/search/", [["EIN", ein]]),
                     ]})
+        ctx.message = "EIN format recognized, but no universal free public EIN-to-company lookup exists. Use the official links for manual verification."
         ctx.found += 1
 
 @register
