@@ -122,7 +122,10 @@ def get_settings():
 
 @app.put("/api/settings")
 def put_settings(body: dict):
-    settings.update(dict(body))
+    try:
+        settings.update(dict(body))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return settings.public()
 
 
