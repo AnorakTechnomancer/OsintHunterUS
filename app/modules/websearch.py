@@ -219,9 +219,16 @@ class WebSearch(Module):
         variants = name_variants(full)
         region = REGION_CODES.get((settings.get("default_region") or "US").upper(), ("cl", "cl-es"))
         gl = region[0]
-        queries = [f'"{full}"', f'"{full}" {SOCIAL}'] + [f'"{v}" {SOCIAL}' for v in variants[:3]]
-        if variants:
-            queries.append(f'"{variants[0]}"')
+        attrs = ctx.entity.get("attrs") or {}
+        city = str(attrs.get("Search city") or "").strip()[:100]
+        state = str(attrs.get("Search state") or "").strip()[:30]
+        zipcode = str(attrs.get("Search ZIP") or "").strip()[:10]
+        location = " ".join(x for x in (city, state, zipcode) if x)
+        # Search local evidence first, but retain nationwide discovery.
+        queries = ([f'"{full}" {location}', f'"{full}" {location} {SOCIAL}'] if location else [])
+        queries += [f'"{full}"', f'"{full}" {SOCIAL}']
+        if not location:
+            queries += [f'"{v}" {SOCIAL}' for v in variants[:2]]
 
         if settings.key("serper"):
             engine, call = "Google (Serper)", _serper
@@ -254,18 +261,20 @@ class WebSearch(Module):
             hits.append({"kind": m[0], "variant": m[1], "title": title, "url": prof[2] if prof else url,
                          "snippet": snippet[:240], "platform": prof[0] if prof else None,
                          "user": prof[1] if prof else None})
-        hits.sort(key=lambda h: (h["kind"] != "exacta", h["platform"] is None))
+        location_terms = [x.casefold() for x in (city, state, zipcode) if x.strip()]
+        for hit in hits:
+            evidence = (hit["title"] + " " + hit["snippet"]).casefold()
+            hit["location_evidence"] = (
+                "location mentioned in search result" if location_terms
+                and any(term in evidence for term in location_terms)
+                else "not established"
+            )
+            hit["identity_status"] = "unverified search result"
+        hits.sort(key=lambda h: (h["location_evidence"] != "location mentioned in search result",
+                                  h["kind"] != "exacta", h["platform"] is None))
 
-        added = 0
-        for h in hits:
-            if h["kind"] == "exacta" and h["platform"] and added < 12:
-                ctx.add("account", h["url"], {
-                    "Plataforma": h["platform"], "Usuario": h["user"], "Título": h["title"],
-                    "Descripción": h["snippet"] or None, "_links": [["Abrir perfil", h["url"]]],
-                    "Verificación": "Búsqueda web: perfil con el nombre completo",
-                }, rel="posible perfil (nombre completo)", pivot=False)
-                added += 1
-
+        # Do not automatically link unverified search hits to the person.
+        # Investigators can add reviewed candidates explicitly in the UI.
         ent = db.update_attrs(ctx.case_id, ctx.entity["id"], {"_web": hits[:60], "_web_engine": engine}, replace=True)
         if ent:
             ctx.job.emit({"type": "entity", "entity": ent, "created": False})
