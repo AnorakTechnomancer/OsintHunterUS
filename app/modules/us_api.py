@@ -22,6 +22,21 @@ def find_sec_ticker(rows, name):
             return row
     return None
 
+def is_ticker_like(value):
+    return bool(re.fullmatch(r"[A-Z]{2,5}(?:[.-][A-Z])?", value.strip()))
+
+def recipient_matches(query, rows):
+    """Only return exact-name matches; autocomplete prefixes are not identities."""
+    matches = []
+    for row in rows[:10]:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("recipient_name") or row.get("name")
+        if name and exact_company_match(query, name):
+            matches.append({"name": name, "uei": row.get("recipient_uei") or row.get("uei"),
+                            "match": "exact name; identity unverified"})
+    return matches
+
 def census_record(rows):
     if not isinstance(rows, list) or len(rows) < 2 or not isinstance(rows[0], list):
         return None
@@ -64,6 +79,12 @@ class SECCompanyAPI(Module):
             raise Skip("Set SEC contact User-Agent in Settings (organization contact email required).")
         headers = {**SEC_HEADERS, "User-Agent": agent}
         rows = await fetch_json(ctx, SEC_TICKERS, headers=headers)
+        if rows is None:
+            ctx.enrich({"SEC status": "Automated SEC lookup unavailable; no company identity verified.",
+                        "_links": [["SEC EDGAR company search", "https://www.sec.gov/edgar/search/"],
+                                   ["SEC company/ticker search", "https://www.sec.gov/edgar/browse/"]]})
+            ctx.message = "SEC denied or throttled automated access. Check contact User-Agent and network; use SEC search links manually."
+            return
         company = find_sec_ticker(rows, ctx.value)
         if not company:
             ctx.message = ctx.message or "No exact SEC company/ticker match; try the company's ticker."
@@ -98,24 +119,22 @@ class USASpendingRecipientAPI(Module):
         query = ctx.value.strip()
         if len(query) < 3:
             raise Skip("Enter at least three characters.")
+        if is_ticker_like(query):
+            raise Skip("Ticker-like input: USAspending searches recipient names, not stock tickers. Search the full legal company name.")
         data = await fetch_json(ctx, USA_AUTOCOMPLETE, method="POST",
                                 json={"search_text": query, "limit": 10})
         if not isinstance(data, dict):
             return
         rows = data.get("results") or []
-        leads = []
-        for row in rows[:10]:
-            if not isinstance(row, dict):
-                continue
-            name = row.get("recipient_name") or row.get("name")
-            uei = row.get("recipient_uei") or row.get("uei")
-            if name:
-                leads.append({"name": name, "uei": uei, "match": "candidate; unverified"})
+        leads = recipient_matches(query, rows)
+        if not leads:
+            ctx.message = "No exact recipient-name matches among the first 10 autocomplete results; broader matches intentionally hidden."
+            return
         ctx.enrich({"USAspending candidate recipients": leads,
                     "USAspending source": USA_AUTOCOMPLETE,
                     "_links": [["USAspending recipient search", "https://www.usaspending.gov/search"]]})
         ctx.found += len(leads)
-        ctx.message = f"{len(leads)} possible recipient matches; verify UEI and address before linking."
+        ctx.message = f"{len(leads)} exact-name candidate(s); verify UEI before linking."
 
 @register
 class CensusZipAPI(Module):
