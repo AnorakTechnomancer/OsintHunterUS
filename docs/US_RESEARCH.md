@@ -35,3 +35,13 @@ python -m app
 The application binds to loopback by default. Existing user settings are stored
 in `data/settings.json`; change `default_region` to `US` and `lang` to `en`
 on existing installations if you previously chose different defaults.
+
+## Live API modules (balanced automation)
+
+- **Census ZIP** runs for ZIP entities with a bounded request to the 2024 ACS 5-year API. ZIP tabulation areas (ZCTAs) are not the same as postal delivery ZIPs.
+- **SEC EDGAR** runs as an explicitly selected deep module for organizations. Set `sec_user_agent` to a contact string such as `Research Team contact@example.org` in settings.json; SEC requires an identified requester. Exact name/ticker matches only. No fuzzy identity merges.
+- **USAspending** runs as an explicitly selected deep module for organizations. Recipient autocomplete yields candidate names/UEIs, not verified corporate relationships. Confirm the recipient before associating awards.
+- Deep modules do not automatically run in ordinary scans; this implements balanced automation by default, with user-controlled wider searches.
+- All modules cap result counts and use request timeouts; no automatic second-hop person searches.
+
+API reference: [SEC EDGAR](https://www.sec.gov/search-filings/edgar-application-programming-interfaces), [USAspending](https://api.usaspending.gov/docs/endpoints), [Census ACS](https://api.census.gov/data/2024/acs/acs5/examples.html).
