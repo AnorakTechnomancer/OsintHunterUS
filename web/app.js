@@ -343,7 +343,7 @@ $("#deleteCaseBtn").addEventListener("click", async () => {
 // ---------------------------------------------------------------- búsqueda
 function fillTypeSelect(detected) {
   const opts = Object.entries(S.types).filter(([, v]) => v.input);
-  const autoLabel = detected ? `Auto: ${typeInfo(detected).label}` : "Tipo: automático";
+  const autoLabel = detected ? `Auto: ${typeInfo(detected).label}` : "Type: automatic";
   const cur = $("#typeSelect").value;
   $("#typeSelect").innerHTML = `<option value="">${esc(autoLabel)}</option>` +
     opts.map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
@@ -369,6 +369,7 @@ $("#searchForm").addEventListener("submit", async (ev) => {
     scheduleLayout();
     await startScan(ent.id, null, Number($("#depthSelect").value));
     $("#searchInput").value = "";
+    $("#typeSelect").value = "";
     fillTypeSelect(null);
     loadCases();
   } catch (e) { toast(e.message, true); }
@@ -1569,8 +1570,8 @@ $("#langBtn").addEventListener("click", () => I18N.setLang(I18N.lang === "en" ? 
 
 // ---------------------------------------------------------------- informe
 const REPORT_SECTIONS = [
-  ["person", "Personas"], ["email", "Emails"], ["phone", "Teléfonos"], ["rut", "RUT"], ["plate", "Patentes"],
-  ["username", "Usuarios"], ["organization", "Organizaciones y empresas"], ["location", "Ubicaciones"],
+  ["person", "People"], ["email", "Emails"], ["phone", "Phones"], ["ein", "EINs"], ["zip", "ZIP codes"], ["plate", "Plates"],
+  ["username", "Usernames"], ["organization", "Organizations"], ["location", "Locations"],
   ["domain", "Dominios"], ["ip", "Direcciones IP"], ["url", "Webs y documentos"], ["crypto", "Criptomonedas"],
   ["hash", "Hashes"], ["breach", "Filtraciones"], ["image", "Imágenes"], ["asn", "Redes (ASN)"],
 ];
@@ -1614,7 +1615,7 @@ function buildReport() {
     highConf && `${highConf} cuenta(s)${confirmed.length ? " más" : ""} con confianza alta`,
     byType("email").length && `${byType("email").length} email(s)`,
     byType("phone").length && `${byType("phone").length} teléfono(s)`,
-    byType("rut").length && `${byType("rut").length} RUT`,
+    byType("ein").length && `${byType("ein").length} EINs`,
     byType("location").length && `${byType("location").length} ubicación(es)`,
     byType("organization").length && `${byType("organization").length} organización(es) o empresa(s) relacionadas`,
     byType("breach").length && `aparece en ${byType("breach").length} filtración(es) de datos`,
