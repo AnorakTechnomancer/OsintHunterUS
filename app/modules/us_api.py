@@ -1,7 +1,5 @@
 """Live US government APIs. Bounded lookups; ambiguous name matches remain leads."""
-import asyncio
 import re
-from urllib.parse import quote
 
 from .base import Module, Skip, register
 
@@ -45,7 +43,7 @@ async def fetch_json(ctx, url, *, method="GET", params=None, json=None, headers=
             ctx.message = f"Source returned HTTP {response.status_code}"
             return None
         return response.json()
-    except (ValueError, Exception) as exc:
+    except Exception as exc:
         # Do not expose API credentials or entire request URLs in user-visible errors.
         ctx.message = f"Source unavailable ({type(exc).__name__})"
         return None
