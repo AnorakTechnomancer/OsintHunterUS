@@ -33,6 +33,12 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
         self.assertEqual(find_sec_ticker(rows, "Example")["ticker"], "EXM")
         self.assertIsNone(find_sec_ticker(rows, "Example Holdings"))
+    def test_people_name_matching_not_identity(self):
+        from app.modules.people import same_name
+        self.assertTrue(same_name("Nathaniel Miller", "Nathaniel Miller"))
+        # Name equality is a search candidate, never proof of identity.
+        self.assertTrue(same_name("Nathaniel E. Miller", "Nathaniel Miller"))
+
     def test_sec_legal_name_variants(self):
         rows = {"0": {"cik_str": 12927, "ticker": "BA", "title": "THE BOEING COMPANY"},
                 "1": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
