@@ -609,6 +609,7 @@ function renderWebHits(hits, engine) {
     return `<div class="web-hit">
       <div>${h.platform ? `<span class="tag">${esc(h.platform)}</span> ` : ""}${link(h.url, h.title || h.url)}</div>
       ${h.snippet ? `<div class="muted small">${esc(h.snippet)}</div>` : ""}
+      ${h.location_evidence === "location mentioned in search result" ? `<div class="muted small">Location mentioned in result · identity unverified</div>` : ""}
       <div class="web-hit-foot">
         ${h.kind !== "exacta" ? `<span class="muted small">Coincide: «${esc(h.variant)}»</span>` : "<span></span>"}
         ${h.platform ? (inGraph ? `<span class="muted small">En el grafo</span>`
@@ -802,7 +803,7 @@ function renderDetails() {
     ${ent.type !== "person" && plainLinks.length ? `<div class="section"><h4>Links</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>` : ""}
     ${fillBox}
     ${reverse ? `<div class="section"><h4>Buscar esta foto en otros sitios</h4><div class="linklist">${reverse}</div></div>` : ""}
-    ${(a._web || []).length ? renderWebHits(a._web, a._web_engine) : ""}
+    ${(a._web || []).length ? (ent.type === "person" ? `<details class="section detail-fold"><summary>Web search (${esc(a._web_engine || "search engine")}) · ${a._web.length} results</summary>${renderWebHits(a._web, a._web_engine)}</details>` : renderWebHits(a._web, a._web_engine)) : ""}
     ${ent.type !== "person" && (a._candidatos || []).length ? `<details class="section detail-fold"><summary>Likely usernames · ${a._candidatos.length}</summary>${a._candidatos.map((c) => `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</details>` : ""}
     ${ent.type !== "person" && (a._dorks || []).length ? `<details class="section detail-fold"><summary>Search dorks · ${a._dorks.length}</summary>${renderDorks(a._dorks)}</details>` : ""}
     ${conns.length ? `<div class="section"><h4>Conexiones (${conns.length})</h4>${conns.slice(0, 150).map(([dir, rel, o, e]) =>
