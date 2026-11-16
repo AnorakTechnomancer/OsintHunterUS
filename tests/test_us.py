@@ -26,6 +26,36 @@ class USInputsTest(unittest.TestCase):
         self.assertEqual(normalize("ein", "123456789"), "12-3456789")
         self.assertEqual(normalize("zip", " 63101-1234 "), "63101-1234")
 
+class PeopleWebSearchTest(unittest.IsolatedAsyncioTestCase):
+    async def test_location_queries_and_no_automatic_identity_link(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, Mock, patch
+        from app.modules.websearch import WebSearch
+        ctx = SimpleNamespace(
+            value="Jane Example",
+            entity={"id": "person:jane example",
+                    "attrs": {"Search city": "Chicago", "Search state": "Illinois"}},
+            http=object(), case_id=1, job=SimpleNamespace(emit=Mock()),
+            found=0, enriched=False, message="",
+            add=Mock(side_effect=AssertionError("unverified profiles must not auto-link")),
+        )
+        rows = [("Jane Example — professional profile",
+                 "https://www.linkedin.com/in/jane-example",
+                 "Jane Example in Chicago, Illinois")]
+        with patch("app.modules.websearch.settings.key", return_value=None), \
+             patch("app.modules.websearch.free_search", new_callable=AsyncMock) as search, \
+             patch("app.modules.websearch.db.update_attrs", return_value=None) as update:
+            search.return_value = (rows, ["DuckDuckGo"], None)
+            await WebSearch().run(ctx)
+        queries = search.call_args.args[1]
+        self.assertTrue(any("Chicago Illinois" in q for q in queries))
+        self.assertIn('"Jane Example"', queries)
+        ctx.add.assert_not_called()
+        hits = update.call_args.args[2]["_web"]
+        self.assertEqual(hits[0]["location_evidence"], "location mentioned in search result")
+        self.assertEqual(hits[0]["identity_status"], "unverified search result")
+
+
 class USAPITest(unittest.TestCase):
     def test_sec_exact_matching(self):
         rows = {"0": {"cik_str": 12345, "ticker": "EXM", "title": "Example Corp"}}
