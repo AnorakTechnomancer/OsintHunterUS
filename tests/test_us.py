@@ -1,7 +1,7 @@
 import unittest
 from app.modules.us import normalize_ein, normalize_us_zip
 from app.models import detect_type, normalize
-from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI
+from app.modules.us_api import find_sec_ticker, census_record, SECCompanyAPI, USASpendingRecipientAPI, CensusZipAPI, is_ticker_like, recipient_matches
 
 class USInputsTest(unittest.TestCase):
     def test_zip(self):
@@ -32,6 +32,13 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(find_sec_ticker(rows, "EXM")["cik_str"], 12345)
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
         self.assertIsNone(find_sec_ticker(rows, "Example"))
+    def test_recipient_filtering(self):
+        self.assertTrue(is_ticker_like("AAPL"))
+        self.assertFalse(is_ticker_like("Boeing Inc"))
+        rows = [{"recipient_name": "AAAPLIANCE SERVICES"}, {"recipient_name": "AAPL"}, {"recipient_name": "AAPL DRIVING SCHOOL"}]
+        self.assertEqual([r["name"] for r in recipient_matches("AAPL", rows)], ["AAPL"])
+        self.assertEqual(recipient_matches("Apple Inc", rows), [])
+
     def test_census_record(self):
         self.assertEqual(census_record([["NAME", "B01003_001E"], ["ZCTA5 63101", "1000"]])["B01003_001E"], "1000")
         self.assertIsNone(census_record([]))
