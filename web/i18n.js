@@ -3,7 +3,7 @@
 // Traducción de la interfaz. El código y los módulos escriben en español; en inglés se traduce lo que se muestra
 // (texto del DOM, atributos, diálogos, etiquetas del grafo e informe) con el diccionario de i18n-en.js.
 const I18N = (() => {
-  const lang = localStorage.getItem("osint-lang") === "en" ? "en" : "es";
+  const lang = localStorage.getItem("osint-lang") === "es" ? "es" : "en";
   const locale = lang === "en" ? "en-US" : "es-CL";
   const exact = new Map(), keys = new Map(), patterns = [];
   const missing = new Set();
