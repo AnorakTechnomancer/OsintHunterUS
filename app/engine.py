@@ -22,7 +22,7 @@ def make_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=httpx.Timeout(20.0, connect=10.0),
         follow_redirects=True,
-        headers={"User-Agent": USER_AGENT, "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"},
+        headers={"User-Agent": USER_AGENT, "Accept-Language": "en-US,en;q=0.9"},
         limits=httpx.Limits(max_connections=80, max_keepalive_connections=40),
     )
 
