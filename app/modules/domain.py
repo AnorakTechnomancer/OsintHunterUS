@@ -38,8 +38,6 @@ def add_page(ctx, page: dict, headers, html: str, parent: str | None = None) -> 
 
     for e in page["emails"][:30]:
         ctx.add("email", e, rel="email en la web", parent=parent)
-    for rut, context in page.get("ruts", [])[:20]:
-        ctx.add("rut", rut, {"Contexto en la web": [context]}, rel="RUT en la web", parent=parent, pivot=False)
     for l in [l for l in page["external_links"] if DISCORD_INVITE.match(l)][:5]:
         ctx.add("url", l, {"_links": [["Abrir", l]]}, rel="invitación de Discord", parent=parent, pivot=False)
     for platform, user, url in page["socials"][:30]:
