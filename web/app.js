@@ -633,8 +633,15 @@ function renderDetails() {
   const a = ent.attrs || {};
   const avatar = safeUrl(a._avatar);
   const canScan = typeInfo(ent.type).input;
-  const rows = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && !ANALYSIS_KEYS.has(k) && v !== null && v !== "")
-    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtValue(v)}</td></tr>`).join("");
+  // Keep core person search fields visible; collapse verbose enrichment and candidates.
+  const secondaryPersonKey = (k) => /(?:candidate|candidato|github|openalex|wikidata|orcid|academic|publication|research|public.record|source|fuente|lookup)/i.test(k);
+  const entries = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && !ANALYSIS_KEYS.has(k) && v !== null && v !== "");
+  const primaryEntries = ent.type === "person" ? entries.filter(([k]) => !secondaryPersonKey(k)) : entries;
+  const secondaryEntries = ent.type === "person" ? entries.filter(([k]) => secondaryPersonKey(k)) : [];
+  const renderAttrRows = (items) => items.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtValue(v)}</td></tr>`).join("");
+  const rows = renderAttrRows(primaryEntries);
+  const secondaryRows = renderAttrRows(secondaryEntries);
+  const secondaryCount = secondaryEntries.reduce((n, [, v]) => n + (Array.isArray(v) ? v.length : 1), 0);
   const level = a["Nivel de confianza"];
   const confBox = a.Confianza != null ? `<div class="section"><h4>¿Es la misma persona?</h4>
       <div>Confianza <b>${esc(a.Confianza)}</b>/100 <span class="conf ${esc(level)}">${esc(level)}</span></div>
@@ -744,14 +751,17 @@ function renderDetails() {
     ${manualBox}
     ${aiSummary}
     ${confBox}
-    ${rows ? `<div class="section"><h4>Datos</h4><table class="attrs">${rows}</table></div>` : ""}
-    ${plainLinks.length ? `<div class="section"><h4>Enlaces</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>` : ""}
+    ${rows ? `<div class="section"><h4>Data</h4><table class="attrs">${rows}</table></div>` : ""}
+    ${secondaryRows ? `<details class="section detail-fold"><summary>Additional research · ${secondaryCount} result${secondaryCount === 1 ? "" : "s"}</summary><table class="attrs">${secondaryRows}</table></details>` : ""}
+    ${plainLinks.length ? (ent.type === "person"
+      ? `<details class="section detail-fold"><summary>Research links · ${plainLinks.length} sources</summary><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></details>`
+      : `<div class="section"><h4>Links</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>`) : ""}
     ${fillBox}
     ${reverse ? `<div class="section"><h4>Buscar esta foto en otros sitios</h4><div class="linklist">${reverse}</div></div>` : ""}
     ${(a._web || []).length ? renderWebHits(a._web, a._web_engine) : ""}
-    ${(a._candidatos || []).length ? `<div class="section"><h4>Usuarios probables</h4>${a._candidatos.map((c) =>
-      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigar</button></div>`).join("")}</div>` : ""}
-    ${(a._dorks || []).length ? `<div class="section"><h4>Dorks de búsqueda (${a._dorks.length})</h4>${renderDorks(a._dorks)}</div>` : ""}
+    ${(a._candidatos || []).length ? `<details class="section detail-fold"><summary>Likely usernames · ${a._candidatos.length}</summary>${a._candidatos.map((c) =>
+      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</details>` : ""}
+    ${(a._dorks || []).length ? `<details class="section detail-fold"><summary>Search dorks · ${a._dorks.length}</summary>${renderDorks(a._dorks)}</details>` : ""}
     ${conns.length ? `<div class="section"><h4>Conexiones (${conns.length})</h4>${conns.slice(0, 150).map(([dir, rel, o, e]) =>
       `<div class="conn" data-goto="${esc(o.id)}">${dir} <span class="dot" style="background:${typeInfo(o.type).color}"></span>${esc(short(o.label, 44))} <span class="rel">${esc(rel)}</span>${e.source === "manual"
         ? `<button class="ghost small unlink" title="Quitar este vínculo" data-unlink="${S.edges.indexOf(e)}">✕</button>` : ""}</div>`).join("")}</div>` : ""}
