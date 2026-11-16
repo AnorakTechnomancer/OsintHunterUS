@@ -633,15 +633,43 @@ function renderDetails() {
   const a = ent.attrs || {};
   const avatar = safeUrl(a._avatar);
   const canScan = typeInfo(ent.type).input;
-  // Keep core person search fields visible; collapse verbose enrichment and candidates.
-  const secondaryPersonKey = (k) => /(?:candidate|candidato|github|openalex|wikidata|orcid|academic|publication|research|public.record|source|fuente|lookup)/i.test(k);
+  // Source-specific disclosures keep unrelated people-search leads out of the main data table.
   const entries = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && !ANALYSIS_KEYS.has(k) && v !== null && v !== "");
-  const primaryEntries = ent.type === "person" ? entries.filter(([k]) => !secondaryPersonKey(k)) : entries;
-  const secondaryEntries = ent.type === "person" ? entries.filter(([k]) => secondaryPersonKey(k)) : [];
+  const sourceForField = (k) => {
+    if (/github/i.test(k)) return "GitHub";
+    if (/wikidata|wikipedia/i.test(k)) return "Wikidata / Wikipedia";
+    if (/openalex/i.test(k)) return "OpenAlex";
+    if (/orcid/i.test(k)) return "ORCID";
+    if (/academic|publication|coauthor|research topic|affiliation/i.test(k)) return "Academic research";
+    if (/people search|people research|public.record research|public people/i.test(k)) return "US people research";
+    if (/search dork/i.test(k)) return "Google search";
+    return null;
+  };
+  const sourceForLink = (l) => {
+    const url = String(l[1] || "").toLowerCase();
+    if (/github\.com|api\.github\.com/.test(url)) return "GitHub";
+    if (/wikidata\.org|wikipedia\.org/.test(url)) return "Wikidata / Wikipedia";
+    if (/openalex\.org/.test(url)) return "OpenAlex";
+    if (/orcid\.org/.test(url)) return "ORCID";
+    if (/google\.com|google\.\w+\/search|scholar\.google/.test(url)) return "Google search";
+    if (/fec\.gov|lda\.senate\.gov/.test(url)) return "Government records";
+    if (/familytreenow\.com/.test(url)) return "FamilyTreeNow";
+    if (/archive\.org/.test(url)) return "Internet Archive";
+    return "Other research links";
+  };
+  const sourceGroups = new Map();
+  const sourceGroup = (name) => {
+    if (!sourceGroups.has(name)) sourceGroups.set(name, { fields: [], links: [] });
+    return sourceGroups.get(name);
+  };
   const renderAttrRows = (items) => items.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtValue(v)}</td></tr>`).join("");
+  const primaryEntries = [];
+  for (const entry of entries) {
+    const source = ent.type === "person" ? sourceForField(entry[0]) : null;
+    if (source) sourceGroup(source).fields.push(entry);
+    else primaryEntries.push(entry);
+  }
   const rows = renderAttrRows(primaryEntries);
-  const secondaryRows = renderAttrRows(secondaryEntries);
-  const secondaryCount = secondaryEntries.reduce((n, [, v]) => n + (Array.isArray(v) ? v.length : 1), 0);
   const level = a["Nivel de confianza"];
   const confBox = a.Confianza != null ? `<div class="section"><h4>¿Es la misma persona?</h4>
       <div>Confianza <b>${esc(a.Confianza)}</b>/100 <span class="conf ${esc(level)}">${esc(level)}</span></div>
@@ -663,6 +691,24 @@ function renderDetails() {
         <a href="${esc(safeUrl(l[1]))}" target="_blank" rel="noopener noreferrer" data-fillcopy="${esc(l[2][0][1])}">${esc(l[0])}</a>
         <div class="fill-vals">${l[2].map(([k, v]) => `<button class="fill-val" data-copyval="${esc(v)}" title="Copiar">${esc(k)}: <b>${esc(v)}</b></button>`).join("")}</div>
       </div>`).join("")}</div>` : "";
+
+  const personLinks = ent.type === "person" ? plainLinks : [];
+  for (const l of personLinks) sourceGroup(sourceForLink(l)).links.push(l);
+  if (ent.type === "person" && (a._candidatos || []).length)
+    sourceGroup("Username suggestions").custom = `<div class="cand-list">${a._candidatos.map((c) =>
+      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</div>`;
+  if (ent.type === "person" && (a._dorks || []).length)
+    sourceGroup("Google search").custom = renderDorks(a._dorks);
+  const sourceSections = ent.type === "person" ? [...sourceGroups.entries()].map(([name, group]) => {
+    const count = group.fields.reduce((n, [, v]) => n + (Array.isArray(v) ? v.length : 1), 0)
+      + group.links.length
+      + (name === "Username suggestions" ? (a._candidatos || []).length : 0)
+      + (name === "Google search" ? (a._dorks || []).length : 0);
+    return `<details class="section detail-fold"><summary>${esc(name)} · ${count} result${count === 1 ? "" : "s"}</summary>
+      ${group.fields.length ? `<table class="attrs">${renderAttrRows(group.fields)}</table>` : ""}
+      ${group.links.length ? `<div class="linklist">${group.links.map((l) => link(l[1], l[0])).join("")}</div>` : ""}
+      ${group.custom || ""}</details>`;
+  }).join("") : "";
 
   const conns = [];
   for (const e of S.edges) {
@@ -752,16 +798,13 @@ function renderDetails() {
     ${aiSummary}
     ${confBox}
     ${rows ? `<div class="section"><h4>Data</h4><table class="attrs">${rows}</table></div>` : ""}
-    ${secondaryRows ? `<details class="section detail-fold"><summary>Additional research · ${secondaryCount} result${secondaryCount === 1 ? "" : "s"}</summary><table class="attrs">${secondaryRows}</table></details>` : ""}
-    ${plainLinks.length ? (ent.type === "person"
-      ? `<details class="section detail-fold"><summary>Research links · ${plainLinks.length} sources</summary><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></details>`
-      : `<div class="section"><h4>Links</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>`) : ""}
+    ${sourceSections}
+    ${ent.type !== "person" && plainLinks.length ? `<div class="section"><h4>Links</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>` : ""}
     ${fillBox}
     ${reverse ? `<div class="section"><h4>Buscar esta foto en otros sitios</h4><div class="linklist">${reverse}</div></div>` : ""}
     ${(a._web || []).length ? renderWebHits(a._web, a._web_engine) : ""}
-    ${(a._candidatos || []).length ? `<details class="section detail-fold"><summary>Likely usernames · ${a._candidatos.length}</summary>${a._candidatos.map((c) =>
-      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</details>` : ""}
-    ${(a._dorks || []).length ? `<details class="section detail-fold"><summary>Search dorks · ${a._dorks.length}</summary>${renderDorks(a._dorks)}</details>` : ""}
+    ${ent.type !== "person" && (a._candidatos || []).length ? `<details class="section detail-fold"><summary>Likely usernames · ${a._candidatos.length}</summary>${a._candidatos.map((c) => `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</details>` : ""}
+    ${ent.type !== "person" && (a._dorks || []).length ? `<details class="section detail-fold"><summary>Search dorks · ${a._dorks.length}</summary>${renderDorks(a._dorks)}</details>` : ""}
     ${conns.length ? `<div class="section"><h4>Conexiones (${conns.length})</h4>${conns.slice(0, 150).map(([dir, rel, o, e]) =>
       `<div class="conn" data-goto="${esc(o.id)}">${dir} <span class="dot" style="background:${typeInfo(o.type).color}"></span>${esc(short(o.label, 44))} <span class="rel">${esc(rel)}</span>${e.source === "manual"
         ? `<button class="ghost small unlink" title="Quitar este vínculo" data-unlink="${S.edges.indexOf(e)}">✕</button>` : ""}</div>`).join("")}</div>` : ""}
