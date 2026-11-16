@@ -33,6 +33,11 @@ class USAPITest(unittest.TestCase):
         self.assertEqual(find_sec_ticker(rows, "example corp")["ticker"], "EXM")
         self.assertEqual(find_sec_ticker(rows, "Example")["ticker"], "EXM")
         self.assertIsNone(find_sec_ticker(rows, "Example Holdings"))
+    def test_academic_sources_are_opt_in(self):
+        from app.modules.people import Academic, Wikidata
+        self.assertTrue(Academic.deep)
+        self.assertTrue(Wikidata.deep)
+
     def test_people_name_matching_not_identity(self):
         from app.modules.people import same_name
         self.assertTrue(same_name("Nathaniel Miller", "Nathaniel Miller"))
