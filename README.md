@@ -2,17 +2,15 @@
 
 <img src="docs/banner.svg" alt="OsintHunter" width="100%">
 
-**🇬🇧 English** · [🇪🇸 Español](README.es.md)
+**🇺🇸 US Edition** · [Original Spanish documentation](README.es.md)
 
 <br>
 
-[![Release](https://img.shields.io/github/v/release/letox4/OsintHunter?style=for-the-badge&color=ff7a1a&labelColor=0d0a07&logo=github)](https://github.com/letox4/OsintHunter/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/letox4/OsintHunter/total?style=for-the-badge&color=ff7a1a&labelColor=0d0a07&logo=windows)](https://github.com/letox4/OsintHunter/releases)
 [![Python](https://img.shields.io/badge/Python-3.11+-ff7a1a?style=for-the-badge&labelColor=0d0a07&logo=python&logoColor=ffb066)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-backend-ff7a1a?style=for-the-badge&labelColor=0d0a07&logo=fastapi&logoColor=ffb066)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-ff7a1a?style=for-the-badge&labelColor=0d0a07)](LICENSE)
 
-[![Modules](https://img.shields.io/badge/modules-49-ffb066?style=flat-square&labelColor=1c1209)](#-modules)
+[![Modules](https://img.shields.io/badge/modules-US%20edition-ffb066?style=flat-square&labelColor=1c1209)](#-modules)
 [![Sites](https://img.shields.io/badge/username_sites-400+-ffb066?style=flat-square&labelColor=1c1209)](#-modules)
 [![No keys](https://img.shields.io/badge/works_without_API_keys-yes-ffb066?style=flat-square&labelColor=1c1209)](#-optional-api-keys)
 [![Languages](https://img.shields.io/badge/UI-EN%20%7C%20ES-ffb066?style=flat-square&labelColor=1c1209)](#)
@@ -20,10 +18,10 @@
 
 ### ${\color{#ff7a1a}\textsf{Find.\ Connect.\ Confirm.}}$
 
-**Desktop OSINT platform** that starts from a username, email, phone, name, domain, IP or Chilean RUT<br>
+**US-focused fork of [letox4/OsintHunter](https://github.com/letox4/OsintHunter). Desktop OSINT platform** that starts from a username, email, phone, name, domain, IP, ZIP or EIN<br>
 and builds an **investigation graph** with confidence scoring, a map, a timeline and a report.
 
-[**⬇️ Download .exe**](https://github.com/letox4/OsintHunter/releases/latest) ·
+[**🇺🇸 US research guide**](docs/US_RESEARCH.md) ·
 [**🚀 Quick start**](#-quick-start) ·
 [**🧩 Modules**](#-modules) ·
 [**📸 Screenshots**](#-screenshots)
@@ -47,7 +45,7 @@ ${\color{#ff7a1a}\textsf{From\ a\ single\ clue\ to\ a\ full\ profile,\ with\ evi
 | 🎯 **Confidence scoring** | Every account gets a 0-100 score from name, photo, location and cross-links. Tells the real person apart from **namesakes**. |
 | 🧬 **Alias families** | Detects that `nyxaluna`, `nyxa.lun4` and `xnyxax` share a root (leet, repeated letters, prefixes) and tries the missing variants. |
 | 🔁 **Smart retries** | When Instagram, TikTok or a WAF rate-limits you, it retries with pauses and leaves a checklist to verify by hand. |
-| 🇨🇱 **Chilean sources** | RUT, license plates, NIC Chile, InfoProbidad, companies by RUT and university theses. |
+| 🇺🇸 **US public sources** | SEC EDGAR, IRS nonprofits, SAM.gov, USAspending, USPTO, FEC, lobbying disclosures, ZIP and EIN research. |
 | 🗺️ **Map & timeline** | Geocodes locations and orders account creations, commits, breaches and archives chronologically. |
 | 📄 **Report** | Exports the case to HTML/PDF, ready to hand over. |
 | 🤖 **Optional AI** | Case summary and analysis with local Ollama or any OpenAI-compatible provider. |
@@ -78,9 +76,9 @@ ${\color{#ff7a1a}\textsf{From\ a\ single\ clue\ to\ a\ full\ profile,\ with\ evi
 
 ### Option 1 · Executable (Windows)
 
-1. Download **`OsintHunter.exe`** from [Releases](https://github.com/letox4/OsintHunter/releases/latest).
+1. The US fork does not yet publish a prebuilt Windows executable. Use the source instructions below, or build one locally.
 2. Put it in any folder and run it. Your browser opens at `http://127.0.0.1:8787`.
-3. Click **English** in the top bar, create a case, type a username / email / phone / name and hit **Investigate**.
+3. Create a case, type a username / email / phone / name and hit **Investigate**.
 
 > [!NOTE]
 > Data is stored in a `data` folder next to the `.exe`. Windows SmartScreen may warn you because the executable isn't signed: *More info → Run anyway*.
@@ -88,8 +86,8 @@ ${\color{#ff7a1a}\textsf{From\ a\ single\ clue\ to\ a\ full\ profile,\ with\ evi
 ### Option 2 · From source
 
 ```bash
-git clone https://github.com/letox4/OsintHunter.git
-cd OsintHunter
+git clone https://github.com/AnorakTechnomancer/OsintHunterUS.git
+cd OsintHunterUS
 start.bat            # creates the venv, installs dependencies and starts
 ```
 
@@ -107,6 +105,10 @@ python -m app
 build_exe.bat        # output goes to dist\OsintHunter.exe
 ```
 
+## 🇺🇸 US-specific research
+
+See the [US research guide](docs/US_RESEARCH.md) for official sources, suggested workflows, verification caveats and test commands. Existing Chile research modules remain in the tree for upstream history but are not loaded in the US edition.
+
 ## 🧩 Modules
 
 <details open>
@@ -122,7 +124,7 @@ build_exe.bat        # output goes to dist\OsintHunter.exe
 | 🧑 **Person** | Web search (DuckDuckGo, Bing, Serper, Brave), dorks, Wikidata, academic publications |
 | 🌐 **Domain / URL** | DNS, RDAP/WHOIS, subdomains (crt.sh), website analysis, Wayback, VirusTotal, URLScan, URLhaus |
 | 🖥️ **IP** | Geolocation, Shodan InternetDB, reverse DNS, Shodan, AbuseIPDB, GreyNoise |
-| 🇨🇱 **Chile** | RUT, license plates, NIC Chile, InfoProbidad / lobby, companies by RUT, theses |
+| 🇺🇸 **United States** | Official research links for businesses, nonprofits, contracts, campaign finance and lobbying; ZIP and EIN formatting; manual plate guidance |
 | 📎 **Other** | Document and image metadata (EXIF/GPS), hashes, MalwareBazaar, crypto wallets, Discord invites, Flickr geo |
 
 </details>

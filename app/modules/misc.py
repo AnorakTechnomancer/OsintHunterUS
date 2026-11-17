@@ -237,8 +237,7 @@ INTERNAL_SITES = _sites("atlassian.net", "postman.com", "swaggerhub.com", "app.s
                         "gitbook.io", "airtable.com", "miro.com", "figma.com")
 DOC_SITES = _sites("scribd.com", "issuu.com", "slideshare.net", "calameo.com", "academia.edu", "researchgate.net",
                    "yumpu.com", "studocu.com")
-CV_SITES = _sites("linkedin.com/in", "computrabajo.com", "laborum.cl", "bumeran.com.ar", "zonajobs.com.ar",
-                  "trabajando.com", "indeed.com", "about.me")
+CV_SITES = _sites("linkedin.com/in", "indeed.com", "about.me", "wellfound.com", "ziprecruiter.com")
 
 # registros oficiales por país (código ISO del ajuste «país por defecto»)
 REGIONAL = {
@@ -270,7 +269,7 @@ REGIONAL = {
 
 def _regional(q: str) -> list[list[str]]:
     region = (settings.get("default_region") or "").upper()
-    groups = REGIONAL.get(region) or (REGIONAL["CL"] + REGIONAL["AR"])
+    groups = REGIONAL.get(region, [])
     return [[label, _g(f"{q} {sites}"), "Registros oficiales"] for label, sites in groups]
 
 
@@ -356,21 +355,17 @@ def dorks_for(t: str, v: str) -> list[list[str]]:
             ["Redes sociales", _g(f"{q} {_sites('facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com', 'threads.net')}")],
             ["Imágenes", f"https://www.google.com/search?tbm=isch&q={quote_plus(q)}"],
             ["Noticias", f"https://www.google.com/search?tbm=nws&q={quote_plus(q)}"])
-        add("Documentos y nube",
-            ["Documentos y CV", _g(f"{q} filetype:pdf OR filetype:doc OR filetype:docx OR filetype:xlsx")],
-            ["Currículum", _g(f'{q} ("curriculum vitae" OR currículum OR CV OR "experiencia laboral")')],
-            ["CV y portales de empleo", _g(f"{q} {CV_SITES}")],
-            ["Plataformas de documentos", _g(f"{q} {DOC_SITES}")],
-            ["Nube expuesta", _g(f"{q} {CLOUD_SITES}")],
-            ["Tesis y trabajos académicos", _g(f'{q} (tesis OR memoria OR "trabajo de título" OR thesis) filetype:pdf')],
-            ["Su RUT en documentos públicos (Chile)", _g(f'{q} ("RUT" OR "R.U.T." OR "RUN") filetype:pdf OR filetype:xlsx OR filetype:xls OR filetype:csv')])
-        add("Chile: Estado y justicia",
-            ["Audiencias de lobby (como lobista o autoridad)", _g(f"{q} site:leylobby.gob.cl")],
-            ["Declaraciones de patrimonio", _g(f"{q} site:infoprobidad.cl")],
-            ["Causas judiciales publicadas", _g(f"{q} {_sites('pjud.cl', 'tribunalconstitucional.cl', 'diarioconstitucional.cl')}")],
-            ["Diario Oficial (sociedades, notificaciones)", _g(f"{q} site:diariooficial.interior.gob.cl")],
-            ["Sueldos y contratos públicos (Transparencia)", _g(f"{q} {_sites('portaltransparencia.cl', 'transparencia.gob.cl', 'mercadopublico.cl')}")],
-            ["Tesis en repositorios chilenos", _g(f"{q} {_sites('repositorio.uchile.cl', 'repositorio.uc.cl', 'repositorio.usm.cl', 'repositorio.udec.cl', 'repositorio.uv.cl', 'bibliotecadigital.uach.cl')}")])
+        add("Documents and professional records",
+            ["Public resumes", _g(f'{q} ("resume" OR "curriculum vitae") filetype:pdf')],
+            ["Professional and employment profiles", _g(f"{q} {CV_SITES}")],
+            ["Public document platforms", _g(f"{q} {DOC_SITES}")],
+            ["Public research papers", _g(f'{q} (research OR thesis OR dissertation) filetype:pdf')])
+        if (settings.get("default_region") or "US").upper() == "US":
+            add("US official sources",
+                ["Federal campaign finance (FEC)", _g(f"{q} site:fec.gov")],
+                ["Federal lobbying disclosures", _g(f"{q} site:lda.senate.gov")],
+                ["Federal court opinions", _g(f"{q} site:govinfo.gov OR site:uscourts.gov")],
+                ["Federal employee directories and publications", _g(f"{q} site:gov")])
         variants = name_variants(v)
         if variants:
             anyq = " OR ".join(f'"{x}"' for x in [v] + variants[:4])

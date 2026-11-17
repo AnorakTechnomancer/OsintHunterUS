@@ -87,6 +87,7 @@ class Academic(Module):
     title = "Publicaciones académicas (OpenAlex, ORCID)"
     description = "Artículos, tesis y patentes firmados con ese nombre: afiliación, coautores, temas y ORCID"
     inputs = ("person",)
+    deep = True  # Academic profiles are opt-in, not default people-search evidence.
     sources = ("api.openalex.org", "pub.orcid.org")
 
     async def run(self, ctx):
@@ -120,46 +121,27 @@ class Academic(Module):
             })
             ctx.found += len(matches)
             return
-        if len(matches) > 1:
-            ctx.enrich({"OpenAlex: autores con este nombre": [
-                f"{a['display_name']} · {a.get('works_count', 0)} trabajos · "
-                + ", ".join(i.get("display_name", "") for i in a.get("last_known_institutions") or [])[:80]
-                for a in matches[:8]]})
-        best = matches[0]
-        aid = best["id"].rsplit("/", 1)[-1]
-        insts = [i for i in best.get("last_known_institutions") or [] if i.get("display_name")]
-        attrs = {
-            "OpenAlex: trabajos": best.get("works_count"),
-            "OpenAlex: citas": best.get("cited_by_count"),
-            "OpenAlex: índice h": (best.get("summary_stats") or {}).get("h_index"),
-            "Temas de investigación": [t["display_name"] for t in (best.get("topics") or [])[:6]] or None,
-            "Afiliación (OpenAlex)": [f"{i['display_name']} ({i.get('country_code') or '?'})" for i in insts] or None,
-            "_links": [["Perfil en OpenAlex", f"https://openalex.org/authors/{aid}"]],
-        }
-        if best.get("orcid"):
-            attrs["ORCID"] = best["orcid"].rsplit("/", 1)[-1]
-            attrs["_links"].append(["ORCID", best["orcid"]])
-        st, w = await ctx.get_json("https://api.openalex.org/works", params={
-            "filter": f"author.id:{aid}", "sort": "cited_by_count:desc", "per-page": 8,
-            "select": "title,publication_year,doi,authorships,primary_location",
-        })
-        coauthors = Counter()
-        if st == 200 and isinstance(w, dict):
-            works = w.get("results") or []
-            attrs["Publicaciones destacadas"] = list(dict.fromkeys(
-                f"{x.get('publication_year')} · {x.get('title')}" for x in works if x.get("title"))) or None
-            for x in works:
-                for au in x.get("authorships") or []:
-                    nm = (au.get("author") or {}).get("display_name")
-                    if nm and not same_name(nm, name):
-                        coauthors[nm] += 1
-            attrs["Coautores frecuentes"] = [f"{n} ({c})" for n, c in coauthors.most_common(8)] or None
-        ctx.enrich(attrs)
-        if len(matches) == 1:
-            for i in insts[:3]:
-                ctx.add("organization", i["display_name"], {"País": i.get("country_code"), "Tipo": i.get("type")},
-                        rel="afiliación académica", pivot=False)
-        ctx.found += 1
+        # A shared name is not evidence that an academic author is the searched person.
+        # Keep each result as an unverified candidate; never attach the top author's
+        # publications, metrics, ORCID or affiliations to the searched identity.
+        candidates = []
+        links = []
+        for author in matches[:12]:
+            aid = str(author.get("id") or "").rsplit("/", 1)[-1]
+            institutions = ", ".join(i.get("display_name", "") for i in author.get("last_known_institutions") or [])
+            candidates.append({
+                "name": author.get("display_name"),
+                "works": author.get("works_count"),
+                "institution": institutions or None,
+                "openalex_id": aid,
+                "status": "unverified name match",
+            })
+            if aid:
+                links.append([f"OpenAlex candidate: {author.get('display_name')}", f"https://openalex.org/authors/{aid}"])
+        ctx.enrich({"OpenAlex candidate authors (not attributed to searched person)": candidates,
+                    "_links": links})
+        ctx.message = f"{len(matches)} matching author profiles; no identity selected or linked."
+        ctx.found += len(candidates)
 
     async def _orcid(self, ctx, name):
         t = name.split()
@@ -181,11 +163,6 @@ class Academic(Module):
             lines.append(f"{h['orcid-id']} · {full}" + (f" · {inst}" if inst else ""))
             links.append([f"ORCID {full}", f"https://orcid.org/{h['orcid-id']}"])
         ctx.enrich({"ORCID: perfiles con este nombre": lines, "_links": links[:5]})
-        if len(hits) == 1:
-            for e in hits[0].get("email") or []:
-                ctx.add("email", e, rel="email en ORCID", pivot=True)
-            for inst in (hits[0].get("institution-name") or [])[:3]:
-                ctx.add("organization", inst, rel="institución (ORCID)", pivot=False)
         ctx.found += len(hits)
 
 
@@ -219,13 +196,14 @@ class Wikidata(Module):
     description = ("Si la persona es pública: fecha y lugar de nacimiento, cargos, estudios, familia, "
                    "web y redes oficiales")
     inputs = ("person",)
+    deep = True  # Public-figure research is opt-in.
     sources = ("wikidata.org",)
 
     async def run(self, ctx):
         name = ctx.value.strip()
         for query in [name] + name_variants(name)[:2]:
             st, d = await ctx.get_json("https://www.wikidata.org/w/api.php", headers=WIKI_UA, params={
-                "action": "wbsearchentities", "search": query, "language": "es", "uselang": "es", "type": "item",
+                "action": "wbsearchentities", "search": query, "language": "en", "uselang": "en", "type": "item",
                 "limit": 10, "format": "json",
             })
             if st != 200 or not isinstance(d, dict):
@@ -239,7 +217,7 @@ class Wikidata(Module):
         partial = query != name
         st, ents = await ctx.get_json("https://www.wikidata.org/w/api.php", headers=WIKI_UA, params={
             "action": "wbgetentities", "ids": "|".join(cands), "props": "claims|sitelinks|descriptions|labels",
-            "languages": "es|en", "format": "json",
+            "languages": "en|es", "format": "json",
         })
         if st != 200 or not isinstance(ents, dict):
             return
@@ -247,59 +225,14 @@ class Wikidata(Module):
                   if any(v.get("id") == "Q5" for v in _claims(e, "P31") if isinstance(v, dict))]
         if not humans:
             return
-        desc = lambda e: ((e.get("descriptions") or {}).get("es") or (e.get("descriptions") or {}).get("en") or {}).get("value", "")  # noqa: E731
-        if len(humans) > 1 or partial:
-            label = lambda e: ((e.get("labels") or {}).get("es") or (e.get("labels") or {}).get("en") or {}).get("value", "")  # noqa: E731
-            key = "Wikidata: personas con nombre parecido" if partial else "Wikidata: personas con este nombre"
-            ctx.enrich({key: [f"{e['id']} · {label(e)} · {desc(e)}" for e in humans],
-                        "_links": [[f"Wikidata {e['id']}", f"https://www.wikidata.org/wiki/{e['id']}"] for e in humans]})
-            ctx.message = (f"Sólo con «{query}»: puede ser otra persona" if partial else
-                           f"{len(humans)} personas públicas con este nombre: revisa cuál es antes de atribuir datos")
-            ctx.found += len(humans)
-            return
-        e = humans[0]
-        ref_ids = {v["id"] for pid in WD_ITEM_PROPS for v in _claims(e, pid) if isinstance(v, dict) and "id" in v}
-        labels = await self._labels(ctx, ref_ids)
-        attrs = {"Descripción (Wikidata)": desc(e), "Wikidata": e["id"]}
-        birth = [v.get("time", "")[1:11] for v in _claims(e, "P569") if isinstance(v, dict)]
-        death = [v.get("time", "")[1:11] for v in _claims(e, "P570") if isinstance(v, dict)]
-        attrs["Fecha de nacimiento"] = birth[0].replace("-00", "") if birth else None
-        attrs["Fecha de fallecimiento"] = death[0].replace("-00", "") if death else None
-        for pid, label in WD_ITEM_PROPS.items():
-            vals = list(dict.fromkeys(labels.get(v["id"], v["id"]) for v in _claims(e, pid) if isinstance(v, dict) and "id" in v))
-            if vals:
-                attrs[label] = vals if len(vals) > 1 else vals[0]
-        links = [["Wikidata", f"https://www.wikidata.org/wiki/{e['id']}"]]
-        for site, base in (("eswiki", "https://es.wikipedia.org/wiki/"), ("enwiki", "https://en.wikipedia.org/wiki/")):
-            title = ((e.get("sitelinks") or {}).get(site) or {}).get("title")
-            if title:
-                links.append([f"Wikipedia ({site[:2]})", base + title.replace(" ", "_")])
-        attrs["_links"] = links
-        images = _claims(e, "P18")
-        if images:
-            attrs["_avatar"] = f"https://commons.wikimedia.org/wiki/Special:FilePath/{images[0].replace(' ', '_')}?width=300"
-        ctx.enrich(attrs)
-
-        place = attrs.get("Lugar de nacimiento")
-        if isinstance(place, str):
-            ctx.add("location", place, rel="lugar de nacimiento")
-        for site in _claims(e, "P856")[:3]:
-            if isinstance(site, str):
-                ctx.add("url", site, {"_links": [["Abrir", site]]}, rel="web oficial", pivot=False)
-        for pid, (platform, tpl) in WD_SOCIAL.items():
-            for handle in _claims(e, pid)[:2]:
-                if not isinstance(handle, str):
-                    continue
-                url = (tpl or PROFILE_URLS.get(platform, "")).format(handle)
-                if not url:
-                    continue
-                acc = ctx.add("account", url, {
-                    "Plataforma": platform, "Usuario": handle, "_links": [["Abrir perfil", url]],
-                    "Verificación": "Indicada en Wikidata (cuenta oficial)",
-                }, rel="cuenta oficial", pivot=False)
-                if acc and platform != "YouTube" and re.fullmatch(r"[\w.\-]{2,40}", handle):
-                    ctx.add("username", handle, rel="usuario", parent=acc)
-        ctx.found += 1
+        desc = lambda e: ((e.get("descriptions") or {}).get("en") or (e.get("descriptions") or {}).get("es") or {}).get("value", "")  # noqa: E731
+        # Even one Wikidata result is only a name match, not verified identity.
+        label = lambda ent: ((ent.get("labels") or {}).get("en") or (ent.get("labels") or {}).get("es") or {}).get("value", "")
+        key = "Wikidata candidate people (unverified)"
+        ctx.enrich({key: [f"{ent['id']} · {label(ent)} · {desc(ent)}" for ent in humans],
+                    "_links": [[f"Wikidata candidate {ent['id']}", f"https://www.wikidata.org/wiki/{ent['id']}"] for ent in humans]})
+        ctx.message = f"{len(humans)} public profiles with matching names; none attributed to searched person."
+        ctx.found += len(humans)
 
     async def _labels(self, ctx, ids: set[str]) -> dict[str, str]:
         out: dict[str, str] = {}

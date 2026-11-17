@@ -13,7 +13,7 @@ from .base import Module, register
 from .people import name_match, name_variants
 
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/130.0 Safari/537.36", "Accept-Language": "es-CL,es;q=0.9,en;q=0.5"}
+                    "Chrome/130.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9"}
 
 SOCIAL = "(site:linkedin.com/in OR site:facebook.com OR site:instagram.com OR site:x.com OR site:tiktok.com)"
 
@@ -29,7 +29,7 @@ PROFILE_PATTERNS = [
     ("TikTok", re.compile(r"^(?:www\.)?tiktok\.com/@([A-Za-z0-9._]{2,24})$"), "https://www.tiktok.com/@{}"),
 ]
 
-REGION_CODES = {"CL": ("cl", "cl-es"), "AR": ("ar", "ar-es"), "ES": ("es", "es-es"), "MX": ("mx", "mx-es"),
+REGION_CODES = {"CL": ("us", "us-en"), "AR": ("ar", "ar-es"), "ES": ("es", "es-es"), "MX": ("mx", "mx-es"),
                 "CO": ("co", "co-es"), "PE": ("pe", "pe-es"), "US": ("us", "us-en")}
 
 
@@ -57,7 +57,7 @@ def _clean(s: str) -> str:
 
 
 async def _serper(http, q, gl):
-    r = await http.post("https://google.serper.dev/search", json={"q": q, "gl": gl, "hl": "es", "num": 20},
+    r = await http.post("https://google.serper.dev/search", json={"q": q, "gl": gl, "hl": "en", "num": 20},
                         headers={"X-API-KEY": settings.key("serper")})
     if r.status_code == 429:
         raise RateLimited("Serper: cuota agotada")
@@ -153,7 +153,7 @@ def _bing_target(href: str) -> str:
 
 
 async def _bing(http, q, gl):
-    r = await http.get("https://www.bing.com/search", params={"q": q, "cc": gl, "setlang": "es", "count": 30}, headers=UA)
+    r = await http.get("https://www.bing.com/search", params={"q": q, "cc": gl, "setlang": "en", "count": 30}, headers=UA)
     if r.status_code != 200 or ('class="b_algo"' not in r.text and "captcha" in r.text.lower()):
         raise RateLimited("Bing limitó las búsquedas automáticas")
     return parse_bing(r.text)
@@ -217,11 +217,18 @@ class WebSearch(Module):
     async def run(self, ctx):
         full = " ".join(ctx.value.split())
         variants = name_variants(full)
-        region = REGION_CODES.get((settings.get("default_region") or "CL").upper(), ("cl", "cl-es"))
+        region = REGION_CODES.get((settings.get("default_region") or "US").upper(), ("cl", "cl-es"))
         gl = region[0]
-        queries = [f'"{full}"', f'"{full}" {SOCIAL}'] + [f'"{v}" {SOCIAL}' for v in variants[:3]]
-        if variants:
-            queries.append(f'"{variants[0]}"')
+        attrs = ctx.entity.get("attrs") or {}
+        city = str(attrs.get("Search city") or "").strip()[:100]
+        state = str(attrs.get("Search state") or "").strip()[:30]
+        zipcode = str(attrs.get("Search ZIP") or "").strip()[:10]
+        location = " ".join(x for x in (city, state, zipcode) if x)
+        # Search local evidence first, but retain nationwide discovery.
+        queries = ([f'"{full}" {location}', f'"{full}" {location} {SOCIAL}'] if location else [])
+        queries += [f'"{full}"', f'"{full}" {SOCIAL}']
+        if not location:
+            queries += [f'"{v}" {SOCIAL}' for v in variants[:2]]
 
         if settings.key("serper"):
             engine, call = "Google (Serper)", _serper
@@ -254,18 +261,20 @@ class WebSearch(Module):
             hits.append({"kind": m[0], "variant": m[1], "title": title, "url": prof[2] if prof else url,
                          "snippet": snippet[:240], "platform": prof[0] if prof else None,
                          "user": prof[1] if prof else None})
-        hits.sort(key=lambda h: (h["kind"] != "exacta", h["platform"] is None))
+        location_terms = [x.casefold() for x in (city, state, zipcode) if x.strip()]
+        for hit in hits:
+            evidence = (hit["title"] + " " + hit["snippet"]).casefold()
+            hit["location_evidence"] = (
+                "location mentioned in search result" if location_terms
+                and any(term in evidence for term in location_terms)
+                else "not established"
+            )
+            hit["identity_status"] = "unverified search result"
+        hits.sort(key=lambda h: (h["location_evidence"] != "location mentioned in search result",
+                                  h["kind"] != "exacta", h["platform"] is None))
 
-        added = 0
-        for h in hits:
-            if h["kind"] == "exacta" and h["platform"] and added < 12:
-                ctx.add("account", h["url"], {
-                    "Plataforma": h["platform"], "Usuario": h["user"], "Título": h["title"],
-                    "Descripción": h["snippet"] or None, "_links": [["Abrir perfil", h["url"]]],
-                    "Verificación": "Búsqueda web: perfil con el nombre completo",
-                }, rel="posible perfil (nombre completo)", pivot=False)
-                added += 1
-
+        # Do not automatically link unverified search hits to the person.
+        # Investigators can add reviewed candidates explicitly in the UI.
         ent = db.update_attrs(ctx.case_id, ctx.entity["id"], {"_web": hits[:60], "_web_engine": engine}, replace=True)
         if ent:
             ctx.job.emit({"type": "entity", "entity": ent, "created": False})

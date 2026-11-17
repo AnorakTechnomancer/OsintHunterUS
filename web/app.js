@@ -343,7 +343,7 @@ $("#deleteCaseBtn").addEventListener("click", async () => {
 // ---------------------------------------------------------------- búsqueda
 function fillTypeSelect(detected) {
   const opts = Object.entries(S.types).filter(([, v]) => v.input);
-  const autoLabel = detected ? `Auto: ${typeInfo(detected).label}` : "Tipo: automático";
+  const autoLabel = detected ? `Auto: ${typeInfo(detected).label}` : "Type: automatic";
   const cur = $("#typeSelect").value;
   $("#typeSelect").innerHTML = `<option value="">${esc(autoLabel)}</option>` +
     opts.map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join("");
@@ -352,9 +352,18 @@ function fillTypeSelect(detected) {
 const detectSoon = debounce(async () => {
   const v = $("#searchInput").value.trim();
   if (!v) return fillTypeSelect(null);
-  try { fillTypeSelect((await api("/api/detect", { method: "POST", body: { value: v } })).type); } catch { /* ignorar */ }
+  try { fillTypeSelect((await api("/api/detect", { method: "POST", body: { value: v } })).type); updatePeopleLocationVisibility(); } catch { /* ignore */ }
 }, 250);
 $("#searchInput").addEventListener("input", detectSoon);
+function updatePeopleLocationVisibility() {
+  const selected = $("#typeSelect").value;
+  const value = $("#searchInput").value.trim();
+  const likelyPerson = selected === "person" || (!selected && value.includes(" "));
+  $("#peopleLocationFields").hidden = !likelyPerson;
+}
+$("#searchInput").addEventListener("input", updatePeopleLocationVisibility);
+$("#typeSelect").addEventListener("change", updatePeopleLocationVisibility);
+
 
 $("#searchForm").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -362,14 +371,27 @@ $("#searchForm").addEventListener("submit", async (ev) => {
   if (!value) return;
   try {
     await ensureCase(value);
-    const ent = await api(`/api/cases/${S.caseId}/entities`, { method: "POST", body: { value, type: $("#typeSelect").value || null } });
+    const type = $("#typeSelect").value || null;
+    const personSearch = type === "person" || (!type && value.includes(" ") && !/\\b(?:Inc|LLC|Corp|Company|Ltd)\\.?$/i.test(value));
+    const attrs = {};
+    if (personSearch) {
+      const city = $("#peopleCity").value.trim();
+      const state = $("#peopleState").value.trim();
+      const zip = $("#peopleZip").value.trim();
+      if (city) attrs["Search city"] = city;
+      if (state) attrs["Search state"] = state;
+      if (zip) attrs["Search ZIP"] = zip;
+    }
+    const ent = await api(`/api/cases/${S.caseId}/entities`, { method: "POST", body: { value, type, attrs } });
     upsertNode(ent);
     renderLegend();
     select(ent.id);
     scheduleLayout();
     await startScan(ent.id, null, Number($("#depthSelect").value));
     $("#searchInput").value = "";
+    $("#typeSelect").value = "";
     fillTypeSelect(null);
+    updatePeopleLocationVisibility();
     loadCases();
   } catch (e) { toast(e.message, true); }
 });
@@ -587,6 +609,7 @@ function renderWebHits(hits, engine) {
     return `<div class="web-hit">
       <div>${h.platform ? `<span class="tag">${esc(h.platform)}</span> ` : ""}${link(h.url, h.title || h.url)}</div>
       ${h.snippet ? `<div class="muted small">${esc(h.snippet)}</div>` : ""}
+      ${h.location_evidence === "location mentioned in search result" ? `<div class="muted small">Location mentioned in result · identity unverified</div>` : ""}
       <div class="web-hit-foot">
         ${h.kind !== "exacta" ? `<span class="muted small">Coincide: «${esc(h.variant)}»</span>` : "<span></span>"}
         ${h.platform ? (inGraph ? `<span class="muted small">En el grafo</span>`
@@ -611,8 +634,43 @@ function renderDetails() {
   const a = ent.attrs || {};
   const avatar = safeUrl(a._avatar);
   const canScan = typeInfo(ent.type).input;
-  const rows = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && !ANALYSIS_KEYS.has(k) && v !== null && v !== "")
-    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtValue(v)}</td></tr>`).join("");
+  // Source-specific disclosures keep unrelated people-search leads out of the main data table.
+  const entries = Object.entries(a).filter(([k, v]) => !k.startsWith("_") && !ANALYSIS_KEYS.has(k) && v !== null && v !== "");
+  const sourceForField = (k) => {
+    if (/github/i.test(k)) return "GitHub";
+    if (/wikidata|wikipedia/i.test(k)) return "Wikidata / Wikipedia";
+    if (/openalex/i.test(k)) return "OpenAlex";
+    if (/orcid/i.test(k)) return "ORCID";
+    if (/academic|publication|coauthor|research topic|affiliation/i.test(k)) return "Academic research";
+    if (/people search|people research|public.record research|public people/i.test(k)) return "US people research";
+    if (/search dork/i.test(k)) return "Google search";
+    return null;
+  };
+  const sourceForLink = (l) => {
+    const url = String(l[1] || "").toLowerCase();
+    if (/github\.com|api\.github\.com/.test(url)) return "GitHub";
+    if (/wikidata\.org|wikipedia\.org/.test(url)) return "Wikidata / Wikipedia";
+    if (/openalex\.org/.test(url)) return "OpenAlex";
+    if (/orcid\.org/.test(url)) return "ORCID";
+    if (/google\.com|google\.\w+\/search|scholar\.google/.test(url)) return "Google search";
+    if (/fec\.gov|lda\.senate\.gov/.test(url)) return "Government records";
+    if (/familytreenow\.com/.test(url)) return "FamilyTreeNow";
+    if (/archive\.org/.test(url)) return "Internet Archive";
+    return "Other research links";
+  };
+  const sourceGroups = new Map();
+  const sourceGroup = (name) => {
+    if (!sourceGroups.has(name)) sourceGroups.set(name, { fields: [], links: [] });
+    return sourceGroups.get(name);
+  };
+  const renderAttrRows = (items) => items.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${fmtValue(v)}</td></tr>`).join("");
+  const primaryEntries = [];
+  for (const entry of entries) {
+    const source = ent.type === "person" ? sourceForField(entry[0]) : null;
+    if (source) sourceGroup(source).fields.push(entry);
+    else primaryEntries.push(entry);
+  }
+  const rows = renderAttrRows(primaryEntries);
   const level = a["Nivel de confianza"];
   const confBox = a.Confianza != null ? `<div class="section"><h4>¿Es la misma persona?</h4>
       <div>Confianza <b>${esc(a.Confianza)}</b>/100 <span class="conf ${esc(level)}">${esc(level)}</span></div>
@@ -634,6 +692,24 @@ function renderDetails() {
         <a href="${esc(safeUrl(l[1]))}" target="_blank" rel="noopener noreferrer" data-fillcopy="${esc(l[2][0][1])}">${esc(l[0])}</a>
         <div class="fill-vals">${l[2].map(([k, v]) => `<button class="fill-val" data-copyval="${esc(v)}" title="Copiar">${esc(k)}: <b>${esc(v)}</b></button>`).join("")}</div>
       </div>`).join("")}</div>` : "";
+
+  const personLinks = ent.type === "person" ? plainLinks : [];
+  for (const l of personLinks) sourceGroup(sourceForLink(l)).links.push(l);
+  if (ent.type === "person" && (a._candidatos || []).length)
+    sourceGroup("Username suggestions").custom = `<div class="cand-list">${a._candidatos.map((c) =>
+      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</div>`;
+  if (ent.type === "person" && (a._dorks || []).length)
+    sourceGroup("Google search").custom = renderDorks(a._dorks);
+  const sourceSections = ent.type === "person" ? [...sourceGroups.entries()].map(([name, group]) => {
+    const count = group.fields.reduce((n, [, v]) => n + (Array.isArray(v) ? v.length : 1), 0)
+      + group.links.length
+      + (name === "Username suggestions" ? (a._candidatos || []).length : 0)
+      + (name === "Google search" ? (a._dorks || []).length : 0);
+    return `<details class="section detail-fold"><summary>${esc(name)} · ${count} result${count === 1 ? "" : "s"}</summary>
+      ${group.fields.length ? `<table class="attrs">${renderAttrRows(group.fields)}</table>` : ""}
+      ${group.links.length ? `<div class="linklist">${group.links.map((l) => link(l[1], l[0])).join("")}</div>` : ""}
+      ${group.custom || ""}</details>`;
+  }).join("") : "";
 
   const conns = [];
   for (const e of S.edges) {
@@ -722,14 +798,14 @@ function renderDetails() {
     ${manualBox}
     ${aiSummary}
     ${confBox}
-    ${rows ? `<div class="section"><h4>Datos</h4><table class="attrs">${rows}</table></div>` : ""}
-    ${plainLinks.length ? `<div class="section"><h4>Enlaces</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>` : ""}
+    ${rows ? `<div class="section"><h4>Data</h4><table class="attrs">${rows}</table></div>` : ""}
+    ${sourceSections}
+    ${ent.type !== "person" && plainLinks.length ? `<div class="section"><h4>Links</h4><div class="linklist">${plainLinks.map((l) => link(l[1], l[0])).join("")}</div></div>` : ""}
     ${fillBox}
     ${reverse ? `<div class="section"><h4>Buscar esta foto en otros sitios</h4><div class="linklist">${reverse}</div></div>` : ""}
-    ${(a._web || []).length ? renderWebHits(a._web, a._web_engine) : ""}
-    ${(a._candidatos || []).length ? `<div class="section"><h4>Usuarios probables</h4>${a._candidatos.map((c) =>
-      `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigar</button></div>`).join("")}</div>` : ""}
-    ${(a._dorks || []).length ? `<div class="section"><h4>Dorks de búsqueda (${a._dorks.length})</h4>${renderDorks(a._dorks)}</div>` : ""}
+    ${(a._web || []).length ? (ent.type === "person" ? `<details class="section detail-fold"><summary>Web search (${esc(a._web_engine || "search engine")}) · ${a._web.length} results</summary>${renderWebHits(a._web, a._web_engine)}</details>` : renderWebHits(a._web, a._web_engine)) : ""}
+    ${ent.type !== "person" && (a._candidatos || []).length ? `<details class="section detail-fold"><summary>Likely usernames · ${a._candidatos.length}</summary>${a._candidatos.map((c) => `<div class="cand"><span>${esc(c)}</span><button class="ghost small" data-cand="${esc(c)}">Investigate</button></div>`).join("")}</details>` : ""}
+    ${ent.type !== "person" && (a._dorks || []).length ? `<details class="section detail-fold"><summary>Search dorks · ${a._dorks.length}</summary>${renderDorks(a._dorks)}</details>` : ""}
     ${conns.length ? `<div class="section"><h4>Conexiones (${conns.length})</h4>${conns.slice(0, 150).map(([dir, rel, o, e]) =>
       `<div class="conn" data-goto="${esc(o.id)}">${dir} <span class="dot" style="background:${typeInfo(o.type).color}"></span>${esc(short(o.label, 44))} <span class="rel">${esc(rel)}</span>${e.source === "manual"
         ? `<button class="ghost small unlink" title="Quitar este vínculo" data-unlink="${S.edges.indexOf(e)}">✕</button>` : ""}</div>`).join("")}</div>` : ""}
@@ -1569,8 +1645,8 @@ $("#langBtn").addEventListener("click", () => I18N.setLang(I18N.lang === "en" ? 
 
 // ---------------------------------------------------------------- informe
 const REPORT_SECTIONS = [
-  ["person", "Personas"], ["email", "Emails"], ["phone", "Teléfonos"], ["rut", "RUT"], ["plate", "Patentes"],
-  ["username", "Usuarios"], ["organization", "Organizaciones y empresas"], ["location", "Ubicaciones"],
+  ["person", "People"], ["email", "Emails"], ["phone", "Phones"], ["ein", "EINs"], ["zip", "ZIP codes"], ["plate", "Plates"],
+  ["username", "Usernames"], ["organization", "Organizations"], ["location", "Locations"],
   ["domain", "Dominios"], ["ip", "Direcciones IP"], ["url", "Webs y documentos"], ["crypto", "Criptomonedas"],
   ["hash", "Hashes"], ["breach", "Filtraciones"], ["image", "Imágenes"], ["asn", "Redes (ASN)"],
 ];
@@ -1614,7 +1690,7 @@ function buildReport() {
     highConf && `${highConf} cuenta(s)${confirmed.length ? " más" : ""} con confianza alta`,
     byType("email").length && `${byType("email").length} email(s)`,
     byType("phone").length && `${byType("phone").length} teléfono(s)`,
-    byType("rut").length && `${byType("rut").length} RUT`,
+    byType("ein").length && `${byType("ein").length} EINs`,
     byType("location").length && `${byType("location").length} ubicación(es)`,
     byType("organization").length && `${byType("organization").length} organización(es) o empresa(s) relacionadas`,
     byType("breach").length && `aparece en ${byType("breach").length} filtración(es) de datos`,
@@ -1735,6 +1811,7 @@ async function openSettings() {
   f.max_pivot_entities.value = s.max_pivot_entities;
   f.sherlock_db.checked = !!s.sherlock_db;
   f.include_nsfw.checked = !!s.include_nsfw;
+  f.sec_user_agent.value = s.sec_user_agent || "";
   f.ai_base_url.value = s.ai_base_url || "";
   f.ai_model.value = s.ai_model || "";
   syncAiPreset();
@@ -1784,6 +1861,7 @@ $("#saveSettingsBtn").addEventListener("click", async (ev) => {
       max_pivot_entities: Number(f.max_pivot_entities.value) || 25,
       sherlock_db: f.sherlock_db.checked,
       include_nsfw: f.include_nsfw.checked,
+      sec_user_agent: f.sec_user_agent.value.trim(),
       ai_base_url: f.ai_base_url.value.trim(),
       ai_model: f.ai_model.value.trim(),
       api_keys,

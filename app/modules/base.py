@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 
 class Skip(Exception):
-    """El módulo no se puede ejecutar (falta una clave, la entrada no aplica, etc.)."""
+    """Module cannot run (missing key, unsupported input, or unavailable source)."""
 
 
 class Module:
@@ -15,15 +15,15 @@ class Module:
     title: str = ""
     description: str = ""
     inputs: tuple[str, ...] = ()
-    # claves obligatorias; si falta alguna el módulo se marca como omitido
+    # Required credentials: missing keys cause a skipped module.
     keys: tuple[str, ...] = ()
-    # claves que mejoran el resultado pero no son necesarias
+    # Optional credentials improve results but are not required.
     optional_keys: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
     timeout: float = 60
-    # Enriquecedor: se ejecuta solo sobre cada entidad nueva que encaje, aunque no se pivote sobre ella.
+    # Enrichment module: run on newly discovered matching entities.
     auto: bool = False
-    # Búsqueda a fondo: nunca entra en la investigación normal ni en el pivotado; sólo se lanza a petición.
+    # Deep module: run only when explicitly requested.
     deep: bool = False
 
     def applies(self, entity: dict) -> bool:

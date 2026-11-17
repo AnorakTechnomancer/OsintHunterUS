@@ -3,29 +3,31 @@ import re
 
 # tipo -> (nombre visible, color, forma en el grafo, ¿se puede investigar directamente?)
 ENTITY_TYPES: dict[str, dict] = {
-    "username": {"label": "Usuario", "color": "#4fc3f7", "shape": "ellipse", "input": True},
+    "username": {"label": "Username", "color": "#4fc3f7", "shape": "ellipse", "input": True},
     "email": {"label": "Email", "color": "#ffb74d", "shape": "round-rectangle", "input": True},
-    "phone": {"label": "Teléfono", "color": "#81c784", "shape": "round-rectangle", "input": True},
-    "person": {"label": "Persona", "color": "#f06292", "shape": "ellipse", "input": True},
-    "domain": {"label": "Dominio", "color": "#ba68c8", "shape": "hexagon", "input": True},
+    "phone": {"label": "Phone", "color": "#81c784", "shape": "round-rectangle", "input": True},
+    "person": {"label": "Person", "color": "#f06292", "shape": "ellipse", "input": True},
+    "domain": {"label": "Domain", "color": "#ba68c8", "shape": "hexagon", "input": True},
     "ip": {"label": "IP", "color": "#e57373", "shape": "diamond", "input": True},
     "url": {"label": "URL", "color": "#90a4ae", "shape": "round-tag", "input": True},
     "hash": {"label": "Hash", "color": "#a1887f", "shape": "rectangle", "input": True},
-    "crypto": {"label": "Cripto", "color": "#ffd54f", "shape": "octagon", "input": True},
-    "rut": {"label": "RUT", "color": "#ff8a65", "shape": "round-pentagon", "input": True},
-    "plate": {"label": "Patente", "color": "#dce775", "shape": "cut-rectangle", "input": True},
-    "account": {"label": "Cuenta", "color": "#4db6ac", "shape": "round-rectangle", "input": False},
-    "location": {"label": "Ubicación", "color": "#aed581", "shape": "triangle", "input": False},
-    "organization": {"label": "Organización", "color": "#7986cb", "shape": "barrel", "input": False},
+    "crypto": {"label": "Crypto", "color": "#ffd54f", "shape": "octagon", "input": True},
+    "ein": {"label": "EIN", "color": "#ff8a65", "shape": "round-pentagon", "input": True},
+    "zip": {"label": "ZIP code", "color": "#a5d6a7", "shape": "round-rectangle", "input": True},
+    "plate": {"label": "License plate", "color": "#dce775", "shape": "cut-rectangle", "input": True},
+    "account": {"label": "Account", "color": "#4db6ac", "shape": "round-rectangle", "input": False},
+    "location": {"label": "Location", "color": "#aed581", "shape": "triangle", "input": False},
+    "organization": {"label": "Organization", "color": "#7986cb", "shape": "barrel", "input": True},
     "asn": {"label": "ASN", "color": "#9575cd", "shape": "barrel", "input": False},
-    "breach": {"label": "Filtración", "color": "#ef5350", "shape": "star", "input": False},
-    "image": {"label": "Imagen", "color": "#4dd0e1", "shape": "rectangle", "input": False},
+    "breach": {"label": "Breach", "color": "#ef5350", "shape": "star", "input": False},
+    "image": {"label": "Image", "color": "#4dd0e1", "shape": "rectangle", "input": False},
 }
 
 # Tipos que el pivotado automático (profundidad > 0) vuelve a investigar.
-AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto", "rut"}
+AUTO_PIVOT_TYPES = {"username", "email", "phone", "domain", "ip", "crypto"}
 
-_RUT = re.compile(r"^\d{1,2}(?:\.\d{3}){2}-?[\dkK]$|^\d{7,8}-[\dkK]$")
+_EIN = re.compile(r"^\d{2}-\d{7}$")
+_ZIP = re.compile(r"^\d{5}(?:-\d{4})?$")
 _PLATE_SEP = re.compile(r"^[A-Za-z]{2}[\s.\-·•][A-Za-z]{2}[\s.\-·•]?\d{2}$|^[A-Za-z]{2,4}[\s.\-·•]\d{2,4}$")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
@@ -65,13 +67,15 @@ def detect_type(value: str) -> str:
         return "crypto"
     if _HEX.match(v) and len(v) in (32, 40, 56, 64, 96, 128):
         return "hash"
-    from .modules.chile import plate_kind
-
-    if _RUT.match(v):
-        return "rut"
-    # sin separadores sólo en mayúsculas, para no confundir con usuarios tipo «abcd12»
-    if plate_kind(v) and (_PLATE_SEP.match(v) or (v.isupper() and re.fullmatch(r"[A-Z]{4}\d{2}|[A-Z]{2}\d{4}", v))):
-        return "plate"
+    if re.fullmatch(r"[A-Z]{2,5}", v):
+        return "organization"  # Uppercase ticker candidate; user can override type.
+    if re.search(r"\b(?:Inc\.?|LLC|Corp\.?|Corporation|Ltd\.?|Company|Co\.?)$", v, re.I):
+        return "organization"
+    if _EIN.fullmatch(v):
+        return "ein"
+    if _ZIP.fullmatch(v):
+        return "zip"
+    # US plate formats differ by state; select the plate entity type manually.
     digits = re.sub(r"\D", "", v)
     if _PHONE.match(v) and 7 <= len(digits) <= 15 and (v.startswith("+") or not re.search(r"[a-z]", v, re.I)):
         return "phone"
@@ -101,15 +105,13 @@ def normalize(etype: str, value: str) -> str:
         v = " ".join(v.split()).title()
     elif etype == "account":
         v = v.rstrip("/")
-    elif etype == "rut":
-        from .modules.chile import rut_fmt, rut_parts
-
-        p = rut_parts(v)
-        v = rut_fmt(*p) if p else v.upper()
+    elif etype == "ein":
+        from .modules.us import normalize_ein
+        v = normalize_ein(v) or v
+    elif etype == "zip":
+        v = v.strip()
     elif etype == "plate":
-        from .modules.chile import plate_clean
-
-        v = plate_clean(v)
+        v = re.sub(r"[\s-]", "", v).upper()
     return v
 
 
@@ -128,8 +130,4 @@ def display_label(etype: str, value: str, attrs: dict) -> str:
         return f"{value} {attrs['Organización']}"
     if etype == "image" and attrs.get("Archivo"):
         return attrs["Archivo"]
-    if etype == "plate":
-        from .modules.chile import plate_display
-
-        return plate_display(value)
     return value

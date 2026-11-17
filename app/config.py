@@ -42,24 +42,25 @@ API_KEYS: dict[str, tuple[str, str]] = {
     "abusech": ("abuse.ch Auth-Key (URLhaus, ThreatFox, MalwareBazaar)", "https://auth.abuse.ch/"),
     "urlscan": ("URLScan.io", "https://urlscan.io/user/profile/"),
     "greynoise": ("GreyNoise Community", "https://viz.greynoise.io/account/api-key"),
-    "github": ("GitHub token (sube el límite de 60 a 5000 peticiones/h)", "https://github.com/settings/tokens"),
+    "github": ("GitHub token (increases API rate limit)", "https://github.com/settings/tokens"),
     "numverify": ("Numverify", "https://numverify.com/product"),
-    "hibp": ("Have I Been Pwned (de pago)", "https://haveibeenpwned.com/API/Key"),
-    "serper": ("Serper.dev (Google; 2500 búsquedas gratis, mejora la búsqueda de personas)", "https://serper.dev/api-key"),
-    "brave": ("Brave Search API (alternativa a Serper)", "https://api-dashboard.search.brave.com/app/keys"),
-    "ai": ("Clave del proveedor de IA (no hace falta con Ollama local)", "https://console.groq.com/keys"),
+    "hibp": ("Have I Been Pwned (paid API)", "https://haveibeenpwned.com/API/Key"),
+    "serper": ("Serper.dev (Google search API; free tier available)", "https://serper.dev/api-key"),
+    "brave": ("Brave Search API (Serper alternative)", "https://api-dashboard.search.brave.com/app/keys"),
+    "ai": ("AI provider key (not required for local Ollama)", "https://console.groq.com/keys"),
 }
 
 DEFAULT_SETTINGS = {
     "api_keys": {},
+    "sec_user_agent": "",
     "ai_base_url": "",
     "ai_model": "",
-    "default_region": "",
+    "default_region": "US",
     "sherlock_db": True,
     "include_nsfw": False,
     "username_timeout": 15,
     "max_pivot_entities": 25,
-    "lang": "es",
+    "lang": "en",
 }
 
 
@@ -82,6 +83,12 @@ class Settings:
 
     def update(self, changes: dict) -> None:
         with self._lock:
+            agent = changes.get("sec_user_agent")
+            if agent is not None:
+                agent = str(agent or "").strip()
+                if agent and ("@" not in agent or len(agent) > 200 or "\\n" in agent or "\\r" in agent):
+                    raise ValueError("SEC User-Agent must contain a contact email and be at most 200 characters.")
+                changes["sec_user_agent"] = agent
             keys = dict(self.data.get("api_keys") or {})
             for k, v in (changes.pop("api_keys", None) or {}).items():
                 if k not in API_KEYS:
